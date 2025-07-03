@@ -9,31 +9,13 @@ if (isLoggedIn()) {
 $error_message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username']);
-    $password = $_POST['password'];
+    $authController = new AuthController();
+    $result = $authController->login($_POST['username'], $_POST['password']);
     
-    if (empty($username) || empty($password)) {
-        $error_message = 'Please fill in all fields.';
+    if ($result['success']) {
+        redirect('dashboard.php');
     } else {
-        try {
-            $stmt = $pdo->prepare("SELECT id, username, password, role, first_name, last_name FROM users WHERE username = ? AND status = 'active'");
-            $stmt->execute([$username]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($user && password_verify($password, $user['password'])) {
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['role'] = $user['role'];
-                $_SESSION['first_name'] = $user['first_name'];
-                $_SESSION['last_name'] = $user['last_name'];
-                
-                redirect('dashboard.php');
-            } else {
-                $error_message = 'Invalid username or password.';
-            }
-        } catch (PDOException $e) {
-            $error_message = 'Login failed. Please try again.';
-        }
+        $error_message = $result['message'];
     }
 }
 ?>

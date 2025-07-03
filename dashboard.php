@@ -2,43 +2,22 @@
 require_once 'config.php';
 requireLogin();
 
-$page_title = 'Dashboard Overview';
-
-// Start output buffering
-ob_start();
-
-// Get dashboard statistics
-try {
-    // Total Sales
-    $stmt = $pdo->query("SELECT SUM(total_amount) as total_sales FROM orders WHERE status = 'completed'");
-    $total_sales = $stmt->fetch(PDO::FETCH_ASSOC)['total_sales'] ?? 0;
-    
-    // Total Inventory Items
-    $stmt = $pdo->query("SELECT COUNT(*) as total_items FROM products WHERE status = 'active'");
-    $total_items = $stmt->fetch(PDO::FETCH_ASSOC)['total_items'] ?? 0;
-    
-    // Total Orders
-    $stmt = $pdo->query("SELECT COUNT(*) as total_orders FROM orders");
-    $total_orders = $stmt->fetch(PDO::FETCH_ASSOC)['total_orders'] ?? 0;
-    
-    // Active Users
-    $stmt = $pdo->query("SELECT COUNT(*) as active_users FROM users WHERE status = 'active'");
-    $active_users = $stmt->fetch(PDO::FETCH_ASSOC)['active_users'] ?? 0;
-    
-    // Recent Activity (Recent Orders)
-    $stmt = $pdo->prepare("SELECT o.*, u.first_name, u.last_name FROM orders o 
-                          JOIN users u ON o.user_id = u.id 
-                          ORDER BY o.created_at DESC LIMIT 5");
-    $stmt->execute();
-    $recent_orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Low Stock Products
-    $stmt = $pdo->query("SELECT * FROM products WHERE stock_quantity <= low_stock_threshold AND status = 'active' ORDER BY stock_quantity ASC LIMIT 5");
-    $low_stock_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-} catch (PDOException $e) {
-    $error_message = "Error fetching dashboard data: " . $e->getMessage();
+// Redirect staff to staff panel
+if (!User::isAdmin()) {
+    header('Location: staff/dashboard.php');
+    exit();
 }
+
+$dashboardController = new DashboardController();
+$stats = $dashboardController->getStats();
+$recentOrders = $dashboardController->getRecentOrders();
+$lowStockProducts = $dashboardController->getLowStockProducts();
+
+$role = $_SESSION['role'];
+$title = $role === 'admin' ? 'Admin Dashboard' : 'Staff Dashboard';
+
+// Start content
+ob_start();
 ?>
 
 <!-- Dashboard Statistics Cards -->
@@ -46,11 +25,11 @@ try {
     <div class="col-xl-3 col-md-6 mb-4">
         <div class="stats-card">
             <div class="d-flex align-items-center">
-                <div class="stats-icon bg-success me-3">
+                <div class="stats-icon bg-success me-3" style="width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: white;">
                     <i class="fas fa-dollar-sign"></i>
                 </div>
                 <div>
-                    <h3 class="mb-0"><?php echo formatCurrency($total_sales); ?></h3>
+                    <h3 class="mb-0"><?php echo formatCurrency($stats['total_sales']); ?></h3>
                     <p class="text-muted mb-0">Total Sales</p>
                     <small class="text-success"><i class="fas fa-arrow-up me-1"></i>+4.75%</small>
                 </div>
@@ -61,13 +40,13 @@ try {
     <div class="col-xl-3 col-md-6 mb-4">
         <div class="stats-card">
             <div class="d-flex align-items-center">
-                <div class="stats-icon bg-info me-3">
+                <div class="stats-icon bg-info me-3" style="width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: white;">
                     <i class="fas fa-boxes"></i>
                 </div>
                 <div>
-                    <h3 class="mb-0"><?php echo $total_items; ?></h3>
-                    <p class="text-muted mb-0">Inventory Items</p>
-                    <small class="text-danger"><i class="fas fa-arrow-down me-1"></i>-2.3%</small>
+                    <h3 class="mb-0"><?php echo $stats['total_products']; ?></h3>
+                    <p class="text-muted mb-0">Products</p>
+                    <small class="text-info"><i class="fas fa-arrow-right me-1"></i>Active</small>
                 </div>
             </div>
         </div>
@@ -76,11 +55,11 @@ try {
     <div class="col-xl-3 col-md-6 mb-4">
         <div class="stats-card">
             <div class="d-flex align-items-center">
-                <div class="stats-icon bg-warning me-3">
+                <div class="stats-icon bg-warning me-3" style="width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: white;">
                     <i class="fas fa-shopping-cart"></i>
                 </div>
                 <div>
-                    <h3 class="mb-0"><?php echo $total_orders; ?></h3>
+                    <h3 class="mb-0"><?php echo $stats['total_orders']; ?></h3>
                     <p class="text-muted mb-0">Total Orders</p>
                     <small class="text-success"><i class="fas fa-arrow-up me-1"></i>+8.2%</small>
                 </div>
@@ -88,20 +67,22 @@ try {
         </div>
     </div>
     
+    <?php if ($role === 'admin'): ?>
     <div class="col-xl-3 col-md-6 mb-4">
         <div class="stats-card">
             <div class="d-flex align-items-center">
-                <div class="stats-icon bg-primary me-3">
+                <div class="stats-icon bg-danger me-3" style="width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: white;">
                     <i class="fas fa-users"></i>
                 </div>
                 <div>
-                    <h3 class="mb-0"><?php echo $active_users; ?></h3>
+                    <h3 class="mb-0"><?php echo $stats['active_users'] ?? 0; ?></h3>
                     <p class="text-muted mb-0">Active Users</p>
                     <small class="text-success"><i class="fas fa-arrow-up me-1"></i>+2.5%</small>
                 </div>
             </div>
         </div>
     </div>
+    <?php endif; ?>
 </div>
 
 <div class="row">
@@ -109,11 +90,11 @@ try {
     <div class="col-xl-8 mb-4">
         <div class="content-card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Recent Activity</h5>
-                <span class="badge bg-primary"><?php echo count($recent_orders); ?> Orders</span>
+                <h5 class="mb-0">Recent Orders</h5>
+                <span class="badge bg-<?php echo $role === 'admin' ? 'danger' : 'success'; ?>"><?php echo count($recentOrders); ?> Orders</span>
             </div>
             <div class="card-body">
-                <?php if (empty($recent_orders)): ?>
+                <?php if (empty($recentOrders)): ?>
                     <div class="text-center py-4">
                         <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
                         <p class="text-muted">No recent orders found</p>
@@ -131,30 +112,21 @@ try {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($recent_orders as $order): ?>
+                                <?php foreach ($recentOrders as $order): ?>
                                 <tr>
                                     <td>
-                                        <strong class="text-primary"><?php echo htmlspecialchars($order['order_number']); ?></strong>
+                                        <strong class="text-<?php echo $role === 'admin' ? 'danger' : 'success'; ?>"><?php echo htmlspecialchars($order['order_number']); ?></strong>
                                     </td>
                                     <td><?php echo htmlspecialchars($order['first_name'] . ' ' . $order['last_name']); ?></td>
                                     <td><?php echo formatCurrency($order['total_amount']); ?></td>
                                     <td>
-                                        <span class="badge bg-<?php echo $order['status'] == 'completed' ? 'success' : ($order['status'] == 'pending' ? 'warning' : 'danger'); ?>">
+                                        <span class="badge bg-<?php echo $order['status'] == 'completed' ? 'success' : 'warning'; ?>">
                                             <?php echo ucfirst($order['status']); ?>
                                         </span>
                                     </td>
                                     <td>
                                         <small class="text-muted">
-                                            <?php 
-                                            $time_diff = time() - strtotime($order['created_at']);
-                                            if ($time_diff < 3600) {
-                                                echo floor($time_diff / 60) . 'min ago';
-                                            } elseif ($time_diff < 86400) {
-                                                echo floor($time_diff / 3600) . 'h ago';
-                                            } else {
-                                                echo date('M j, Y', strtotime($order['created_at']));
-                                            }
-                                            ?>
+                                            <?php echo Layout::getTimeAgo($order['created_at']); ?>
                                         </small>
                                     </td>
                                 </tr>
@@ -167,21 +139,22 @@ try {
         </div>
     </div>
     
-    <!-- Low Stock Alert -->
+    <!-- Low Stock Alert or Quick Actions -->
     <div class="col-xl-4 mb-4">
+        <?php if ($role === 'admin'): ?>
         <div class="content-card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Low Stock Alert</h5>
-                <span class="badge bg-danger"><?php echo count($low_stock_products); ?> Items</span>
+                <span class="badge bg-danger"><?php echo count($lowStockProducts); ?> Items</span>
             </div>
             <div class="card-body">
-                <?php if (empty($low_stock_products)): ?>
+                <?php if (empty($lowStockProducts)): ?>
                     <div class="text-center py-4">
                         <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
                         <p class="text-muted">All items are well stocked</p>
                     </div>
                 <?php else: ?>
-                    <?php foreach ($low_stock_products as $product): ?>
+                    <?php foreach ($lowStockProducts as $product): ?>
                     <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-light rounded">
                         <div>
                             <div class="fw-bold text-dark"><?php echo htmlspecialchars($product['name']); ?></div>
@@ -191,20 +164,48 @@ try {
                     </div>
                     <?php endforeach; ?>
                     
-                    <?php if (isAdmin()): ?>
                     <div class="text-center mt-3">
-                        <a href="inventory.php" class="btn btn-sm btn-outline-primary">
+                        <a href="inventory.php" class="btn btn-sm btn-outline-danger">
                             <i class="fas fa-boxes me-1"></i>Manage Inventory
                         </a>
                     </div>
-                    <?php endif; ?>
                 <?php endif; ?>
             </div>
         </div>
+        <?php else: ?>
+        <!-- Staff Quick Actions -->
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="pos.php" class="btn btn-success btn-lg">
+                        <i class="fas fa-shopping-cart me-2"></i>
+                        Start New Sale
+                    </a>
+                    <a href="sales.php" class="btn btn-outline-success">
+                        <i class="fas fa-chart-line me-2"></i>
+                        View Sales Reports
+                    </a>
+                </div>
+                
+                <div class="mt-4 p-3 bg-light rounded">
+                    <h6 class="text-success mb-2">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Staff Access
+                    </h6>
+                    <small class="text-muted">
+                        You have access to POS operations and sales reporting. Contact admin for inventory management.
+                    </small>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 
-<!-- Quick Actions -->
+<!-- Quick Actions Row -->
 <div class="row">
     <div class="col-12">
         <div class="content-card">
@@ -214,12 +215,12 @@ try {
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-3 mb-3">
-                        <a href="pos.php" class="btn btn-primary w-100 btn-custom">
+                        <a href="pos.php" class="btn btn-<?php echo $role === 'admin' ? 'danger' : 'success'; ?> w-100 btn-custom">
                             <i class="fas fa-shopping-cart me-2"></i>
                             New Sale
                         </a>
                     </div>
-                    <?php if (isAdmin()): ?>
+                    <?php if ($role === 'admin'): ?>
                     <div class="col-md-3 mb-3">
                         <a href="inventory.php" class="btn btn-success w-100 btn-custom">
                             <i class="fas fa-plus me-2"></i>
@@ -227,14 +228,14 @@ try {
                         </a>
                     </div>
                     <div class="col-md-3 mb-3">
-                        <a href="user_management.php" class="btn btn-info w-100 btn-custom">
+                        <a href="users.php" class="btn btn-info w-100 btn-custom">
                             <i class="fas fa-user-plus me-2"></i>
-                            Add User
+                            Manage Users
                         </a>
                     </div>
                     <?php endif; ?>
                     <div class="col-md-3 mb-3">
-                        <a href="sales_analysis.php" class="btn btn-warning w-100 btn-custom">
+                        <a href="sales.php" class="btn btn-warning w-100 btn-custom">
                             <i class="fas fa-chart-bar me-2"></i>
                             View Reports
                         </a>
@@ -247,5 +248,5 @@ try {
 
 <?php
 $content = ob_get_clean();
-include 'layout.php';
+Layout::render($content, $title, $role);
 ?>

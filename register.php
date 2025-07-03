@@ -10,42 +10,13 @@ $error_message = '';
 $success_message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username']);
-    $email = trim($_POST['email']);
-    $password = $_POST['password'];
-    $confirm_password = $_POST['confirm_password'];
-    $first_name = trim($_POST['first_name']);
-    $last_name = trim($_POST['last_name']);
+    $authController = new AuthController();
+    $result = $authController->register($_POST);
     
-    // Validation
-    if (empty($username) || empty($email) || empty($password) || empty($first_name) || empty($last_name)) {
-        $error_message = 'Please fill in all fields.';
-    } elseif ($password !== $confirm_password) {
-        $error_message = 'Passwords do not match.';
-    } elseif (strlen($password) < 6) {
-        $error_message = 'Password must be at least 6 characters long.';
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error_message = 'Please enter a valid email address.';
+    if ($result['success']) {
+        $success_message = $result['message'];
     } else {
-        try {
-            // Check if username or email already exists
-            $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
-            $stmt->execute([$username, $email]);
-            
-            if ($stmt->fetch()) {
-                $error_message = 'Username or email already exists.';
-            } else {
-                // Hash password and insert user
-                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                
-                $stmt = $pdo->prepare("INSERT INTO users (username, email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?, 'staff')");
-                $stmt->execute([$username, $email, $hashed_password, $first_name, $last_name]);
-                
-                $success_message = 'Registration successful! You can now log in.';
-            }
-        } catch (PDOException $e) {
-            $error_message = 'Registration failed. Please try again.';
-        }
+        $error_message = $result['message'];
     }
 }
 ?>

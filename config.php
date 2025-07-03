@@ -1,4 +1,7 @@
 <?php
+// Set timezone for Philippines (Manila)
+date_default_timezone_set('Asia/Manila');
+
 // Database configuration
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'pointshift_pos');
@@ -12,36 +15,38 @@ define('SITE_NAME', 'PointShift POS');
 // Session configuration
 session_start();
 
-// Database connection
-try {
-    $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch(PDOException $e) {
-    die("Connection failed: " . $e->getMessage());
-}
+// Autoload classes
+spl_autoload_register(function ($className) {
+    $directories = [
+        'classes/',
+        'controllers/',
+        'helpers/'
+    ];
+    
+    foreach ($directories as $dir) {
+        $file = __DIR__ . '/' . $dir . $className . '.php';
+        if (file_exists($file)) {
+            require_once $file;
+            return;
+        }
+    }
+});
 
-// Helper functions
+// Helper functions for backward compatibility
 function isLoggedIn() {
-    return isset($_SESSION['user_id']);
+    return User::isLoggedIn();
 }
 
 function isAdmin() {
-    return isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
+    return User::isAdmin();
 }
 
 function requireLogin() {
-    if (!isLoggedIn()) {
-        header('Location: login.php');
-        exit();
-    }
+    User::requireLogin();
 }
 
 function requireAdmin() {
-    requireLogin();
-    if (!isAdmin()) {
-        header('Location: dashboard.php');
-        exit();
-    }
+    User::requireAdmin();
 }
 
 function redirect($url) {
@@ -50,6 +55,6 @@ function redirect($url) {
 }
 
 function formatCurrency($amount) {
-    return '₱' . number_format($amount, 2);
+    return Layout::formatCurrency($amount);
 }
 ?>
