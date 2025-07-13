@@ -31,8 +31,20 @@ UPDATE `orders` SET
     `updated_at` = NOW()
 WHERE `subtotal` = 0.00;
 
--- Step 5: Verify the table structure (optional - shows the updated table)
+-- Step 6: Check and update users table to ensure first_name and last_name columns exist
+-- This fixes the layout.php undefined array key warnings
+ALTER TABLE `users` 
+ADD COLUMN `first_name` VARCHAR(50) DEFAULT 'User' AFTER `password`,
+ADD COLUMN `last_name` VARCHAR(50) DEFAULT '' AFTER `first_name`;
+
+-- Update any NULL values in existing users
+UPDATE `users` SET 
+    `first_name` = COALESCE(`first_name`, `username`),
+    `last_name` = COALESCE(`last_name`, '')
+WHERE `first_name` IS NULL OR `first_name` = '';
+
+-- Step 7: Verify the table structure (optional - shows the updated table)
 DESCRIBE `orders`;
 
--- Step 6: Check a sample record (optional - shows updated data)
+-- Step 8: Check a sample record (optional - shows updated data)
 SELECT * FROM `orders` ORDER BY `created_at` DESC LIMIT 1;

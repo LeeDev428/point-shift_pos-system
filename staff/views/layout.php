@@ -165,7 +165,7 @@
         <div class="sidebar-header">
             <i class="fas fa-cash-register fa-2x text-white mb-2"></i>
             <h4>PointShift</h4>
-            <small>Cashier Panel</small>
+            <small>Staff Panel</small>
         </div>
         
         <nav class="sidebar-menu">
@@ -177,9 +177,33 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'pos.php' ? 'active' : ''; ?>" href="pos.php">
-                        <i class="fas fa-shopping-cart"></i>
-                        Point of Sale
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'manage_product.php' ? 'active' : ''; ?>" href="manage_product.php">
+                        <i class="fas fa-box"></i>
+                        Manage Product
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'stock_monitoring.php' ? 'active' : ''; ?>" href="stock_monitoring.php">
+                        <i class="fas fa-warehouse"></i>
+                        Stock Monitoring
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'barcode_scanner.php' ? 'active' : ''; ?>" href="barcode_scanner.php">
+                        <i class="fas fa-barcode"></i>
+                        Barcode Scanner
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'low_stock_alerts.php' ? 'active' : ''; ?>" href="low_stock_alerts.php">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Low Stock Alerts
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'inventory_reports.php' ? 'active' : ''; ?>" href="inventory_reports.php">
+                        <i class="fas fa-file-alt"></i>
+                        Inventory Reports
                     </a>
                 </li>
                 <li class="nav-item">
@@ -212,8 +236,28 @@
             <div class="dropdown">
                 <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
                     <i class="fas fa-user-circle me-2"></i>
-                    <?php echo htmlspecialchars($_SESSION['first_name'] . ' ' . $_SESSION['last_name']); ?>
-                    <span class="badge bg-success ms-2">Cashier</span>
+                    <?php 
+                    // Check if session variables are missing and refresh them from database
+                    if (!isset($_SESSION['first_name']) || !isset($_SESSION['last_name'])) {
+                        try {
+                            $db = Database::getInstance()->getConnection();
+                            $stmt = $db->prepare("SELECT first_name, last_name FROM users WHERE id = ?");
+                            $stmt->execute([$_SESSION['user_id']]);
+                            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                            if ($user) {
+                                $_SESSION['first_name'] = $user['first_name'];
+                                $_SESSION['last_name'] = $user['last_name'];
+                            }
+                        } catch(Exception $e) {
+                            // Fallback if database query fails
+                        }
+                    }
+                    
+                    $firstName = $_SESSION['first_name'] ?? $_SESSION['username'] ?? 'User';
+                    $lastName = $_SESSION['last_name'] ?? '';
+                    echo htmlspecialchars(trim($firstName . ' ' . $lastName)); 
+                    ?>
+                    <span class="badge bg-success ms-2">Staff</span>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>Profile</a></li>

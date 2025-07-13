@@ -77,10 +77,7 @@ ob_start();
             </div>
             <div class="card-body">
                 <div class="d-grid gap-3">
-                    <a href="pos.php" class="btn btn-danger btn-lg">
-                        <i class="fas fa-shopping-cart me-2"></i>
-                        Start New Sale
-                    </a>
+                 
                     <a href="transactions.php" class="btn btn-outline-danger">
                         <i class="fas fa-receipt me-2"></i>
                         View Transaction History
@@ -134,7 +131,7 @@ ob_start();
     <div class="col-12">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-transparent border-0">
-                <h5 class="mb-0">Cashier Tips</h5>
+                <h5 class="mb-0">Staff Tips</h5>
             </div>
             <div class="card-body">
                 <div class="row">

@@ -12,11 +12,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $authController = new AuthController();
     $result = $authController->login($_POST['username'], $_POST['password']);
     
-    if ($result['success']) {
+if ($result['success']) {
+    // Redirect based on role
+    $role = isset($_SESSION['role']) ? $_SESSION['role'] : '';
+    if ($role === 'admin') {
         redirect('dashboard.php');
+    } elseif ($role === 'staff') {
+        redirect('staff/dashboard.php');
+    } elseif ($role === 'cashier') {
+        redirect('cashier/dashboard.php');
     } else {
-        $error_message = $result['message'];
+        redirect('dashboard.php'); // fallback
     }
+} else {
+    $error_message = $result['message'];
+}
 }
 ?>
 <!DOCTYPE html>
@@ -136,8 +146,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="mt-4 p-3 bg-light rounded">
                             <small class="text-muted">
                                 <strong>Demo Credentials:</strong><br>
-                                Username: admin<br>
-                                Password: admin123
+                                <span class="d-block mb-1">Admin: <b>admin</b> / <b>admin123</b></span>
+                                <span class="d-block mb-1">Staff: <b>staff</b> / <b>staff123</b></span>
+                                <span class="d-block mb-1">Cashier: <b>cashier</b> / <b>cashier123</b></span>
                             </small>
                         </div>
                     </div>

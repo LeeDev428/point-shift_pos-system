@@ -10,7 +10,7 @@ if (User::isAdmin()) {
 $dashboardController = new DashboardController();
 $orders = $dashboardController->getRecentOrders(20);
 
-$title = 'Transaction History';
+$title = 'Staff Transaction History';
 
 ob_start();
 ?>
