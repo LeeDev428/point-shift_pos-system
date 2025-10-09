@@ -219,6 +219,12 @@
                         Email Admin
                     </a>
                 </li>
+                  <li class="nav-item">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'account_settings.php' ? 'active' : ''; ?>" href="account_settings.php">
+                        <i class="fas fa-user-cog"></i>
+                        Account Settings
+                    </a>
+                </li>
             </ul>
         </nav>
     </div>
