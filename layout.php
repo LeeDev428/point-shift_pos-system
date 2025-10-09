@@ -216,6 +216,13 @@ requireLogin();
                     </a>
                 </li>
                 <?php endif; ?>
+                
+                <li class="nav-item">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'view_shifts.php' ? 'active' : ''; ?>" href="view_shifts.php">
+                        <i class="fas fa-calendar-alt"></i>
+                        View Shifts
+                    </a>
+                </li>
             </ul>
         </nav>
     </div>
