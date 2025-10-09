@@ -1,6 +1,10 @@
 <?php
 require_once 'config.php';
 
+// Registration is disabled. Only admins can create users through User Management
+redirect('login.php?error=Registration is disabled. Please contact your administrator.');
+exit();
+
 // If user is already logged in, redirect to dashboard
 if (isLoggedIn()) {
     redirect('dashboard.php');
