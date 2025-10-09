@@ -213,6 +213,12 @@
                         Daily Sales
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'email.php' ? 'active' : ''; ?>" href="email.php">
+                        <i class="fas fa-envelope"></i>
+                        Email Admin
+                    </a>
+                </li>
             </ul>
         </nav>
     </div>
