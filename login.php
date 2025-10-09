@@ -131,8 +131,7 @@ if ($result['success']) {
                         
                         <div class="text-center mt-3">
                             <small class="text-muted">
-                                Don't have an account? 
-                                <a href="register.php" class="text-decoration-none">Register here</a>
+                                Need an account? Contact your administrator.
                             </small>
                         </div>
                         
