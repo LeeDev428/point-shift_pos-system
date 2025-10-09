@@ -181,12 +181,40 @@ requireLogin();
                 </li>
                 
                 <?php if (isAdmin()): ?>
-                <!-- <li class="nav-item">
+                <li class="nav-item">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'sales_trend_analysis.php' ? 'active' : ''; ?>" href="sales_trend_analysis.php">
+                        <i class="fas fa-chart-area"></i>
+                        Sales Trend Analysis
+                    </a>
+                </li>
+                
+                <li class="nav-item">
                     <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'user_management.php' ? 'active' : ''; ?>" href="user_management.php">
-                        <i class="fas fa-users"></i>
+                        <i class="fas fa-users-cog"></i>
                         User Management
                     </a>
-                </li> -->
+                </li>
+                
+                <li class="nav-item">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'messages.php' ? 'active' : ''; ?>" href="messages.php">
+                        <i class="fas fa-comments"></i>
+                        Messages
+                        <?php
+                        // Show unread message count
+                        $unread_query = $conn->query("SELECT COUNT(*) as count FROM messages WHERE recipient_id = {$_SESSION['user_id']} AND is_read = 0");
+                        $unread = $unread_query->fetch_assoc()['count'];
+                        if ($unread > 0): ?>
+                            <span class="badge bg-warning text-dark ms-2"><?php echo $unread; ?></span>
+                        <?php endif; ?>
+                    </a>
+                </li>
+                
+                <li class="nav-item">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'settings.php' ? 'active' : ''; ?>" href="settings.php">
+                        <i class="fas fa-cog"></i>
+                        Settings
+                    </a>
+                </li>
                 <?php endif; ?>
             </ul>
         </nav>
