@@ -187,6 +187,18 @@
                         Inventory Reports
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'view_shifts.php' ? 'active' : ''; ?>" href="../view_shifts.php">
+                        <i class="fas fa-calendar-alt"></i>
+                        View Shifts
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'account_settings.php' ? 'active' : ''; ?>" href="account_settings.php">
+                        <i class="fas fa-user-cog"></i>
+                        Account Settings
+                    </a>
+                </li>
             </ul>
         </nav>
     </div>
