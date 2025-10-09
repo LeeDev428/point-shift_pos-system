@@ -144,6 +144,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
+    
+    // Shift Management Actions
+    if ($action === 'create_shift') {
+        $shift_name = trim($_POST['shift_name']);
+        $shift_date = $_POST['shift_date'];
+        $start_time = $_POST['start_time'];
+        $end_time = $_POST['end_time'];
+        $description = trim($_POST['description']);
+        $location = trim($_POST['location']);
+        $max_employees = intval($_POST['max_employees']);
+        $created_by = $_SESSION['user_id'];
+        
+        $stmt = $conn->prepare("INSERT INTO shifts (shift_name, shift_date, start_time, end_time, description, location, max_employees, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssssssii", $shift_name, $shift_date, $start_time, $end_time, $description, $location, $max_employees, $created_by);
+        
+        if ($stmt->execute()) {
+            $message = "Shift created successfully!";
+            $message_type = "success";
+        } else {
+            $message = "Error creating shift: " . $conn->error;
+            $message_type = "danger";
+        }
+    }
+    
+    if ($action === 'update_shift') {
+        $shift_id = $_POST['shift_id'];
+        $shift_name = trim($_POST['shift_name']);
+        $shift_date = $_POST['shift_date'];
+        $start_time = $_POST['start_time'];
+        $end_time = $_POST['end_time'];
+        $description = trim($_POST['description']);
+        $location = trim($_POST['location']);
+        $max_employees = intval($_POST['max_employees']);
+        $status = $_POST['status'];
+        
+        $stmt = $conn->prepare("UPDATE shifts SET shift_name=?, shift_date=?, start_time=?, end_time=?, description=?, location=?, max_employees=?, status=? WHERE id=?");
+        $stmt->bind_param("ssssssssi", $shift_name, $shift_date, $start_time, $end_time, $description, $location, $max_employees, $status, $shift_id);
+        
+        if ($stmt->execute()) {
+            $message = "Shift updated successfully!";
+            $message_type = "success";
+        } else {
+            $message = "Error updating shift.";
+            $message_type = "danger";
+        }
+    }
+    
+    if ($action === 'delete_shift') {
+        $shift_id = $_POST['shift_id'];
+        
+        $stmt = $conn->prepare("DELETE FROM shifts WHERE id=?");
+        $stmt->bind_param("i", $shift_id);
+        
+        if ($stmt->execute()) {
+            $message = "Shift deleted successfully!";
+            $message_type = "success";
+        } else {
+            $message = "Error deleting shift.";
+            $message_type = "danger";
+        }
+    }
+    
+    if ($action === 'assign_employees') {
+        $shift_id = $_POST['shift_id'];
+        $user_ids = $_POST['user_ids'] ?? [];
+        $assigned_by = $_SESSION['user_id'];
+        
+        // First, remove all existing assignments for this shift
+        $delete_stmt = $conn->prepare("DELETE FROM shift_assignments WHERE shift_id = ?");
+        $delete_stmt->bind_param("i", $shift_id);
+        $delete_stmt->execute();
+        
+        // Then, add new assignments
+        if (!empty($user_ids)) {
+            $stmt = $conn->prepare("INSERT INTO shift_assignments (shift_id, user_id, assigned_by) VALUES (?, ?, ?)");
+            foreach ($user_ids as $user_id) {
+                $stmt->bind_param("iii", $shift_id, $user_id, $assigned_by);
+                $stmt->execute();
+            }
+            $message = "Employees assigned to shift successfully!";
+            $message_type = "success";
+        } else {
+            $message = "All employees removed from shift.";
+            $message_type = "info";
+        }
+    }
 }
 
 // Fetch store settings
@@ -167,6 +253,26 @@ $user_stats = $conn->query("SELECT
     SUM(CASE WHEN role = 'cashier' THEN 1 ELSE 0 END) as cashier_count,
     SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_count
 FROM users")->fetch_assoc();
+
+// Fetch shifts with assignment count
+$shifts_query = "SELECT s.*, 
+    u.first_name as created_by_name, u.last_name as created_by_lastname,
+    (SELECT COUNT(*) FROM shift_assignments WHERE shift_id = s.id) as assigned_count
+    FROM shifts s
+    LEFT JOIN users u ON s.created_by = u.id
+    ORDER BY s.shift_date DESC, s.start_time ASC";
+$shifts = $conn->query($shifts_query)->fetch_all(MYSQLI_ASSOC);
+
+// Get shift statistics
+$shift_stats = $conn->query("SELECT 
+    COUNT(*) as total_shifts,
+    SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) as scheduled_count,
+    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_count,
+    SUM(CASE WHEN shift_date >= CURDATE() THEN 1 ELSE 0 END) as upcoming_count
+FROM shifts")->fetch_assoc();
+
+// Fetch all active users for assignment dropdown
+$active_users = $conn->query("SELECT id, username, first_name, last_name, role FROM users WHERE status = 'active' ORDER BY first_name, last_name")->fetch_all(MYSQLI_ASSOC);
 
 ob_start();
 ?>
@@ -226,6 +332,11 @@ ob_start();
     <li class="nav-item" role="presentation">
         <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#user-management" type="button" role="tab">
             <i class="fas fa-users-cog me-2"></i>User Management
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="shifts-tab" data-bs-toggle="tab" data-bs-target="#shift-management" type="button" role="tab">
+            <i class="fas fa-calendar-alt me-2"></i>Shift Management
         </button>
     </li>
 </ul>
@@ -471,9 +582,151 @@ ob_start();
             </div>
         </div>
     </div>
+    
+    <!-- Shift Management Tab -->
+    <div class="tab-pane fade" id="shift-management" role="tabpanel">
+        <!-- Shift Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Total Shifts</h6>
+                            <h3 class="mb-0"><?php echo number_format($shift_stats['total_shifts']); ?></h3>
+                        </div>
+                        <div class="stats-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Scheduled</h6>
+                            <h3 class="mb-0"><?php echo number_format($shift_stats['scheduled_count']); ?></h3>
+                        </div>
+                        <div class="stats-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Completed</h6>
+                            <h3 class="mb-0"><?php echo number_format($shift_stats['completed_count']); ?></h3>
+                        </div>
+                        <div class="stats-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Upcoming</h6>
+                            <h3 class="mb-0"><?php echo number_format($shift_stats['upcoming_count']); ?></h3>
+                        </div>
+                        <div class="stats-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                            <i class="fas fa-arrow-right"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Add Shift Button -->
+        <div class="mb-3">
+            <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#addShiftModal">
+                <i class="fas fa-plus me-2"></i>Create New Shift
+            </button>
+        </div>
+        
+        <!-- Shifts Table -->
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Shifts</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Shift Name</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Location</th>
+                                <th>Assigned</th>
+                                <th>Status</th>
+                                <th>Created By</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($shifts)): ?>
+                                <tr>
+                                    <td colspan="9" class="text-center text-muted">No shifts created yet.</td>
+                                </tr>
+                            <?php else: ?>
+                                <?php foreach ($shifts as $shift): ?>
+                                    <tr>
+                                        <td><?php echo $shift['id']; ?></td>
+                                        <td><strong><?php echo htmlspecialchars($shift['shift_name']); ?></strong></td>
+                                        <td><?php echo date('M d, Y', strtotime($shift['shift_date'])); ?></td>
+                                        <td><?php echo date('h:i A', strtotime($shift['start_time'])) . ' - ' . date('h:i A', strtotime($shift['end_time'])); ?></td>
+                                        <td><?php echo htmlspecialchars($shift['location'] ?? 'N/A'); ?></td>
+                                        <td>
+                                            <span class="badge bg-info">
+                                                <?php echo $shift['assigned_count']; ?> / <?php echo $shift['max_employees']; ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <?php
+                                            $status_colors = [
+                                                'scheduled' => 'primary',
+                                                'in-progress' => 'warning',
+                                                'completed' => 'success',
+                                                'cancelled' => 'danger'
+                                            ];
+                                            $color = $status_colors[$shift['status']] ?? 'secondary';
+                                            ?>
+                                            <span class="badge bg-<?php echo $color; ?>">
+                                                <?php echo ucfirst($shift['status']); ?>
+                                            </span>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($shift['created_by_name'] . ' ' . $shift['created_by_lastname']); ?></td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-sm btn-outline-success" onclick="assignEmployees(<?php echo $shift['id']; ?>, '<?php echo htmlspecialchars($shift['shift_name']); ?>')" title="Assign Employees">
+                                                    <i class="fas fa-user-plus"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-primary" onclick="editShift(<?php echo htmlspecialchars(json_encode($shift)); ?>)" title="Edit Shift">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger" onclick="deleteShift(<?php echo $shift['id']; ?>, '<?php echo htmlspecialchars($shift['shift_name']); ?>')" title="Delete Shift">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- Add User Modal -->
+<!-- Add Shift Modal -->
 <div class="modal fade" id="addUserModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -617,6 +870,163 @@ ob_start();
     </div>
 </div>
 
+<!-- Add Shift Modal -->
+<div class="modal fade" id="addShiftModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Create New Shift</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="create_shift">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Shift Name *</label>
+                            <input type="text" class="form-control" name="shift_name" required placeholder="e.g., Morning Shift">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Date *</label>
+                            <input type="date" class="form-control" name="shift_date" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Start Time *</label>
+                            <input type="time" class="form-control" name="start_time" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">End Time *</label>
+                            <input type="time" class="form-control" name="end_time" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Location</label>
+                            <input type="text" class="form-control" name="location" placeholder="e.g., Main Store">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Max Employees *</label>
+                            <input type="number" class="form-control" name="max_employees" value="10" min="1" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="3" placeholder="Shift details..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Create Shift</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Shift Modal -->
+<div class="modal fade" id="editShiftModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit Shift</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="update_shift">
+                    <input type="hidden" name="shift_id" id="edit_shift_id">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Shift Name *</label>
+                            <input type="text" class="form-control" name="shift_name" id="edit_shift_name" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Date *</label>
+                            <input type="date" class="form-control" name="shift_date" id="edit_shift_date" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Start Time *</label>
+                            <input type="time" class="form-control" name="start_time" id="edit_start_time" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">End Time *</label>
+                            <input type="time" class="form-control" name="end_time" id="edit_end_time" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Location</label>
+                            <input type="text" class="form-control" name="location" id="edit_location">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Max Employees *</label>
+                            <input type="number" class="form-control" name="max_employees" id="edit_max_employees" min="1" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Status *</label>
+                            <select class="form-select" name="status" id="edit_status" required>
+                                <option value="scheduled">Scheduled</option>
+                                <option value="in-progress">In Progress</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" id="edit_description" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Shift</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Assign Employees Modal -->
+<div class="modal fade" id="assignEmployeesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-user-plus me-2"></i>Assign Employees to Shift</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="assign_employees">
+                    <input type="hidden" name="shift_id" id="assign_shift_id">
+                    <p class="mb-3">Shift: <strong id="assign_shift_name"></strong></p>
+                    <label class="form-label">Select Employees</label>
+                    <div id="employee-checkboxes" class="mb-3" style="max-height: 400px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px;">
+                        <?php foreach ($active_users as $user): ?>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input employee-checkbox" type="checkbox" name="user_ids[]" value="<?php echo $user['id']; ?>" id="user_<?php echo $user['id']; ?>">
+                                <label class="form-check-label" for="user_<?php echo $user['id']; ?>">
+                                    <?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?> 
+                                    <span class="badge bg-<?php echo $user['role'] == 'admin' ? 'danger' : ($user['role'] == 'staff' ? 'primary' : 'info'); ?>">
+                                        <?php echo ucfirst($user['role']); ?>
+                                    </span>
+                                </label>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Assign Employees</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 function editUser(user) {
     document.getElementById('edit_user_id').value = user.id;
@@ -650,6 +1060,59 @@ function deleteUser(userId, username) {
         document.body.appendChild(form);
         form.submit();
     }
+}
+
+// Shift Management Functions
+function editShift(shift) {
+    document.getElementById('edit_shift_id').value = shift.id;
+    document.getElementById('edit_shift_name').value = shift.shift_name;
+    document.getElementById('edit_shift_date').value = shift.shift_date;
+    document.getElementById('edit_start_time').value = shift.start_time;
+    document.getElementById('edit_end_time').value = shift.end_time;
+    document.getElementById('edit_location').value = shift.location || '';
+    document.getElementById('edit_max_employees').value = shift.max_employees;
+    document.getElementById('edit_status').value = shift.status;
+    document.getElementById('edit_description').value = shift.description || '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('editShiftModal'));
+    modal.show();
+}
+
+function deleteShift(shiftId, shiftName) {
+    if (confirm(`Are you sure you want to delete shift "${shiftName}"? This will also remove all employee assignments. This action cannot be undone.`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.innerHTML = `
+            <input type="hidden" name="action" value="delete_shift">
+            <input type="hidden" name="shift_id" value="${shiftId}">
+        `;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function assignEmployees(shiftId, shiftName) {
+    document.getElementById('assign_shift_id').value = shiftId;
+    document.getElementById('assign_shift_name').textContent = shiftName;
+    
+    // Clear all checkboxes first
+    document.querySelectorAll('.employee-checkbox').forEach(cb => cb.checked = false);
+    
+    // Fetch currently assigned employees via AJAX
+    fetch(`get_shift_assignments.php?shift_id=${shiftId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                data.user_ids.forEach(userId => {
+                    const checkbox = document.getElementById(`user_${userId}`);
+                    if (checkbox) checkbox.checked = true;
+                });
+            }
+        })
+        .catch(error => console.error('Error fetching assignments:', error));
+    
+    const modal = new bootstrap.Modal(document.getElementById('assignEmployeesModal'));
+    modal.show();
 }
 
 // Keep the active tab after form submission
