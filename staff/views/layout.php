@@ -179,7 +179,7 @@
                 <li class="nav-item">
                     <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'manage_product.php' ? 'active' : ''; ?>" href="manage_product.php">
                         <i class="fas fa-box"></i>
-                        Manage Product
+                        Inventory
                     </a>
                 </li>
                 <li class="nav-item">
