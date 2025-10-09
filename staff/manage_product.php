@@ -65,11 +65,11 @@ $stats = [
 $products = $db->query("SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id ORDER BY p.id DESC LIMIT $perPage OFFSET $offset")->fetchAll(PDO::FETCH_ASSOC);
 
 // Set page title for layout
-$title = 'Manage Products';
+$title = 'Inventory';
 ob_start();
 ?>
 <div class="container py-4" style="max-height: 90vh; overflow-y: auto;">
-    <h2>Manage Products</h2>
+    <h2>Inventory</h2>
 
     <!-- Statistics Cards -->
     <div class="row mb-4">
