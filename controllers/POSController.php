@@ -12,9 +12,11 @@ class POSController {
             $params = [];
             
             if (!empty($search)) {
-                $sql .= " AND (name LIKE ? OR barcode LIKE ?)";
+                $sql .= " AND (name LIKE ? OR barcode LIKE ? OR sku LIKE ? OR id = ?)";
                 $params[] = "%{$search}%";
                 $params[] = "%{$search}%";
+                $params[] = "%{$search}%";
+                $params[] = is_numeric($search) ? intval($search) : 0;
             }
             
             if (!empty($category)) {
