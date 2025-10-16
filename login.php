@@ -134,12 +134,6 @@ if ($result['success']) {
                                 Need an account? Contact your administrator.
                             </small>
                         </div>
-                        
-                        <div class="text-center mt-2">
-                            <small class="text-muted">
-                                <a href="index.php" class="text-decoration-none">← Back to Home</a>
-                            </small>
-                        </div>
 
                         <!-- Demo credentials -->
                         <div class="mt-4 p-3 bg-light rounded">
