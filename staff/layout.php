@@ -164,24 +164,6 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'stock_monitoring.php' ? 'active' : ''; ?>" href="stock_monitoring.php">
-                        <i class="fas fa-warehouse"></i>
-                        Stock Monitoring
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'barcode_scanner.php' ? 'active' : ''; ?>" href="barcode_scanner.php">
-                        <i class="fas fa-barcode"></i>
-                        Barcode Scanner
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'low_stock_alerts.php' ? 'active' : ''; ?>" href="low_stock_alerts.php">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        Low Stock Alerts
-                    </a>
-                </li>
-                <li class="nav-item">
                     <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'inventory_reports.php' ? 'active' : ''; ?>" href="inventory_reports.php">
                         <i class="fas fa-file-alt"></i>
                         Inventory Reports
