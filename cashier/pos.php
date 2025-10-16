@@ -79,17 +79,25 @@ ob_start();
                     <div class="row g-1 mb-1">
                         <div class="col-6">
                             <small>Discount:</small>
-                            <input type="number" id="discount" class="form-control form-control-sm d-inline" style="width: 40px; height: 20px; font-size: 0.7rem;" value="0" min="0">%
+                            <select id="discount-type" class="form-select form-select-sm" onchange="applyDiscountType(this.value)">
+                                <option value="0">None</option>
+                                <option value="20">PWD (20%)</option>
+                                <option value="20">Senior Citizen (20%)</option>
+                                <option value="custom">Custom</option>
+                            </select>
                         </div>
-                        <div class="col-6 text-end"><small id="discount-amount">₱0.00</small></div>
+                        <div class="col-6 text-end">
+                            <small id="discount-amount">₱0.00</small>
+                            <input type="number" id="discount" class="form-control form-control-sm d-none" style="width: 50px; height: 20px; font-size: 0.7rem;" value="0" min="0" max="100" onchange="updateCart()">
+                        </div>
                     </div>
                     <div class="row g-1 mb-1">
                         <div class="col-6"><small>Tax (12%):</small></div>
                         <div class="col-6 text-end"><small id="tax">₱0.00</small></div>
                     </div>
-                    <div class="row g-1 mb-2">
-                        <div class="col-6"><strong style="font-size: 0.9rem;">Total:</strong></div>
-                        <div class="col-6 text-end"><strong id="total" class="text-danger" style="font-size: 0.9rem;">₱0.00</strong></div>
+                    <div class="row g-1 mb-2 p-2 bg-warning bg-opacity-25 rounded">
+                        <div class="col-6"><strong style="font-size: 1.1rem;">TOTAL:</strong></div>
+                        <div class="col-6 text-end"><strong id="total" class="text-danger" style="font-size: 1.2rem;">₱0.00</strong></div>
                     </div>
                     
                     <div class="row g-1 mb-2">
@@ -143,18 +151,7 @@ ob_start();
             <div class="card-body p-2">
                 <!-- Search Bar -->
                 <div class="mb-2">
-                    <input type="text" id="product-search" class="form-control form-control-sm" placeholder="Search by name or code..." value="<?php echo htmlspecialchars($search); ?>">
-                </div>
-                
-                <!-- Category Tabs -->
-                <div class="mb-2">
-                    <nav class="nav nav-pills nav-fill">
-                        <a class="nav-link py-1 <?php echo empty($category) ? 'active' : ''; ?>" href="?category=" style="font-size: 0.75rem;">All</a>
-                        <a class="nav-link py-1 <?php echo $category === 'Electronics' ? 'active' : ''; ?>" href="?category=Electronics" style="font-size: 0.75rem;">Electronics</a>
-                        <a class="nav-link py-1 <?php echo $category === 'Clothing' ? 'active' : ''; ?>" href="?category=Clothing" style="font-size: 0.75rem;">Clothing</a>
-                        <a class="nav-link py-1 <?php echo $category === 'Food' ? 'active' : ''; ?>" href="?category=Food" style="font-size: 0.75rem;">Food</a>
-                        <a class="nav-link py-1 <?php echo $category === 'Automotive' ? 'active' : ''; ?>" href="?category=Automotive" style="font-size: 0.75rem;">Auto</a>
-                    </nav>
+                    <input type="text" id="product-search" class="form-control form-control-sm" placeholder="Search by name, code, SKU, or barcode..." value="<?php echo htmlspecialchars($search); ?>">
                 </div>
                 
                 <!-- Products Grid -->
@@ -187,6 +184,27 @@ ob_start();
                     <?php endif; ?>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Receipt Modal -->
+<div class="modal fade" id="receiptModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2 bg-light">
+                <h6 class="modal-title">Receipt</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-2" id="receipt-content" style="font-family: 'Courier New', monospace; font-size: 11px;">
+                <!-- Receipt content will be inserted here -->
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-primary" onclick="window.print()">
+                    <i class="fas fa-print"></i> Print
+                </button>
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -286,11 +304,25 @@ function updateTotals() {
     document.getElementById('total').textContent = '₱' + total.toFixed(2);
 }
 
+// Discount type handler
+function applyDiscountType(value) {
+    const discountInput = document.getElementById('discount');
+    if (value === 'custom') {
+        discountInput.classList.remove('d-none');
+        discountInput.focus();
+    } else {
+        discountInput.classList.add('d-none');
+        discountPercent = parseFloat(value) || 0;
+        discountInput.value = discountPercent;
+        updateTotals();
+    }
+}
+
 // Discount input handler
-document.getElementById('discount').addEventListener('input', function() {
-    discountPercent = parseFloat(this.value) || 0;
+function updateCart() {
+    discountPercent = parseFloat(document.getElementById('discount').value) || 0;
     updateTotals();
-});
+}
 
 // Quick payment buttons
 document.addEventListener('click', function(e) {
@@ -382,13 +414,20 @@ document.getElementById('complete-sale').addEventListener('click', function() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(`Sale completed!\nOrder: ${data.order_number}\nTotal: ₱${data.total.toFixed(2)}\nChange: ₱${data.change.toFixed(2)}`);
+            // Generate receipt
+            const receiptHTML = generateReceipt(data, cart);
+            document.getElementById('receipt-content').innerHTML = receiptHTML;
             
-            // Clear cart
+            // Show receipt modal
+            const receiptModal = new bootstrap.Modal(document.getElementById('receiptModal'));
+            receiptModal.show();
+            
+            // Clear cart after showing receipt
             cart = [];
             updateCartDisplay();
             document.getElementById('amount-received').value = '';
             document.getElementById('discount').value = '0';
+            document.getElementById('discount-type').value = '0';
             discountPercent = 0;
         } else {
             alert('Error completing sale: ' + data.message);
@@ -402,6 +441,86 @@ document.getElementById('product-search').addEventListener('keyup', function(e) 
         window.location.href = `pos.php?search=${encodeURIComponent(this.value)}`;
     }
 });
+
+// Generate receipt HTML
+function generateReceipt(data, items) {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-PH');
+    const timeStr = now.toLocaleTimeString('en-PH');
+    const cashierName = '<?php echo htmlspecialchars($_SESSION['first_name'] . ' ' . $_SESSION['last_name']); ?>';
+    
+    let itemsHTML = '';
+    items.forEach(item => {
+        const itemTotal = item.price * item.quantity;
+        itemsHTML += `
+            <tr style="font-size: 10px;">
+                <td>${item.name}</td>
+                <td class="text-center">${item.quantity}</td>
+                <td class="text-end">₱${item.price.toFixed(2)}</td>
+                <td class="text-end">₱${itemTotal.toFixed(2)}</td>
+            </tr>
+        `;
+    });
+    
+    return `
+        <div class="text-center mb-2">
+            <h5 class="mb-0" style="font-size: 14px;"><strong>PointShift POS</strong></h5>
+            <small style="font-size: 9px;">Modern Point of Sale System</small>
+        </div>
+        <hr class="my-1">
+        <div style="font-size: 9px;">
+            <div><strong>Date:</strong> ${dateStr} ${timeStr}</div>
+            <div><strong>Order #:</strong> ${data.order_number}</div>
+            <div><strong>Cashier:</strong> ${cashierName}</div>
+        </div>
+        <hr class="my-1">
+        <table class="table table-sm mb-1" style="font-size: 10px;">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th class="text-center">Qty</th>
+                    <th class="text-end">Price</th>
+                    <th class="text-end">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${itemsHTML}
+            </tbody>
+        </table>
+        <hr class="my-1">
+        <table class="table table-sm mb-0" style="font-size: 10px;">
+            <tr>
+                <td>Subtotal:</td>
+                <td class="text-end">₱${data.subtotal.toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>Discount:</td>
+                <td class="text-end">-₱${data.discount.toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>Tax (12%):</td>
+                <td class="text-end">₱${data.tax.toFixed(2)}</td>
+            </tr>
+            <tr class="fw-bold" style="font-size: 12px; border-top: 2px solid #000;">
+                <td>TOTAL:</td>
+                <td class="text-end">₱${data.total.toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>Amount Paid:</td>
+                <td class="text-end">₱${(data.total + data.change).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>Change:</td>
+                <td class="text-end">₱${data.change.toFixed(2)}</td>
+            </tr>
+        </table>
+        <hr class="my-1">
+        <div class="text-center" style="font-size: 9px;">
+            <p class="mb-0">Thank you for your purchase!</p>
+            <p class="mb-0">Visit us again soon!</p>
+        </div>
+    `;
+}
 </script>
 
 <style>
@@ -478,6 +597,19 @@ document.getElementById('product-search').addEventListener('keyup', function(e) 
     background-color: #007bff;
     border-color: #007bff;
     color: white;
+}
+
+/* Print styles for receipt */
+@media print {
+    body * { visibility: hidden; }
+    #receipt-content, #receipt-content * { visibility: visible; }
+    #receipt-content {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 80mm;
+    }
+    .modal-header, .modal-footer, .btn-close { display: none !important; }
 }
 
 @media (max-width: 991px) {
