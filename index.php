@@ -86,13 +86,10 @@ if (isLoggedIn()) {
                     </div>
                     <div class="action-section">
                         <h3 class="mb-4">Welcome to PointShift</h3>
-                        <p class="text-muted mb-4">Choose your account type to access the appropriate dashboard.</p>
+                        <p class="text-muted mb-4">Sign in to access your dashboard.</p>
                         <div class="d-flex flex-column flex-sm-row justify-content-center">
                             <a href="login.php" class="btn btn-login btn-custom">
                                 <i class="fas fa-sign-in-alt me-2"></i>Sign In
-                            </a>
-                            <a href="register.php" class="btn btn-register btn-custom">
-                                <i class="fas fa-user-plus me-2"></i>Register
                             </a>
                         </div>
                         
