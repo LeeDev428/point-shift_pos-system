@@ -24,8 +24,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $search = $_GET['search'] ?? '';
+$category_id = $_GET['category_id'] ?? '';
+$stock_filter = $_GET['stock_filter'] ?? '';
 $stats = $inventoryController->getStats();
-$products = $inventoryController->getAllProducts($search);
+$products = $inventoryController->getAllProducts($search, $category_id, $stock_filter);
+$categories = $inventoryController->getAllCategories();
 
 $page_title = 'Inventory Management';
 
@@ -35,59 +38,67 @@ ob_start();
 <!-- Stats Cards -->
 <div class="row mb-4">
     <div class="col-xl-3 col-md-6 mb-3">
-        <div class="stats-card">
-            <div class="d-flex align-items-center">
-                <div class="stats-icon bg-primary me-3" style="width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: white;">
-                    <i class="fas fa-boxes"></i>
-                </div>
-                <div>
-                    <h3 class="mb-0"><?php echo $stats['total_products']; ?></h3>
-                    <p class="text-muted mb-0">Total Products</p>
+        <a href="inventory.php" class="text-decoration-none">
+            <div class="stats-card <?php echo empty($stock_filter) ? 'border-primary' : ''; ?>" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                <div class="d-flex align-items-center">
+                    <div class="stats-icon bg-primary me-3" style="width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: white;">
+                        <i class="fas fa-boxes"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0 text-dark"><?php echo $stats['total_products']; ?></h3>
+                        <p class="text-muted mb-0">Total Products</p>
+                    </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
     
     <div class="col-xl-3 col-md-6 mb-3">
-        <div class="stats-card">
-            <div class="d-flex align-items-center">
-                <div class="stats-icon bg-warning me-3" style="width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: white;">
-                    <i class="fas fa-exclamation-triangle"></i>
-                </div>
-                <div>
-                    <h3 class="mb-0"><?php echo $stats['low_stock']; ?></h3>
-                    <p class="text-muted mb-0">Low Stock</p>
+        <a href="inventory.php?stock_filter=low_stock" class="text-decoration-none">
+            <div class="stats-card <?php echo $stock_filter === 'low_stock' ? 'border-warning' : ''; ?>" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                <div class="d-flex align-items-center">
+                    <div class="stats-icon bg-warning me-3" style="width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: white;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0 text-dark"><?php echo $stats['low_stock']; ?></h3>
+                        <p class="text-muted mb-0">Low Stock</p>
+                    </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
     
     <div class="col-xl-3 col-md-6 mb-3">
-        <div class="stats-card">
-            <div class="d-flex align-items-center">
-                <div class="stats-icon bg-danger me-3" style="width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: white;">
-                    <i class="fas fa-times-circle"></i>
-                </div>
-                <div>
-                    <h3 class="mb-0"><?php echo $stats['out_of_stock']; ?></h3>
-                    <p class="text-muted mb-0">Out of Stock</p>
+        <a href="inventory.php?stock_filter=out_of_stock" class="text-decoration-none">
+            <div class="stats-card <?php echo $stock_filter === 'out_of_stock' ? 'border-danger' : ''; ?>" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                <div class="d-flex align-items-center">
+                    <div class="stats-icon bg-danger me-3" style="width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: white;">
+                        <i class="fas fa-times-circle"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0 text-dark"><?php echo $stats['out_of_stock']; ?></h3>
+                        <p class="text-muted mb-0">Out of Stock</p>
+                    </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
     
     <div class="col-xl-3 col-md-6 mb-3">
-        <div class="stats-card">
-            <div class="d-flex align-items-center">
-                <div class="stats-icon bg-success me-3" style="width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: white;">
-                    <i class="fas fa-dollar-sign"></i>
-                </div>
-                <div>
-                    <h3 class="mb-0"><?php echo formatCurrency($stats['total_value']); ?></h3>
-                    <p class="text-muted mb-0">Total Value</p>
+        <a href="inventory.php?stock_filter=in_stock" class="text-decoration-none">
+            <div class="stats-card <?php echo $stock_filter === 'in_stock' ? 'border-success' : ''; ?>" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                <div class="d-flex align-items-center">
+                    <div class="stats-icon bg-success me-3" style="width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: white;">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0 text-dark"><?php echo $stats['in_stock']; ?></h3>
+                        <p class="text-muted mb-0">In Stock</p>
+                    </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
 </div>
 
@@ -107,17 +118,30 @@ ob_start();
                 </div>
             </div>
             <div class="card-body">
-                <!-- Search Bar -->
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <form method="GET" class="d-flex">
-                            <input type="text" name="search" class="form-control" placeholder="Search by Name or SKU" value="<?php echo htmlspecialchars($search); ?>">
-                            <button type="submit" class="btn btn-outline-danger ms-2">
-                                <i class="fas fa-search"></i>
-                            </button>
-                        </form>
+                <!-- Search and Filter Bar -->
+                <form method="GET" class="row mb-3">
+                    <div class="col-md-5 mb-2">
+                        <input type="text" name="search" class="form-control" placeholder="Search by Name, SKU or Barcode" value="<?php echo htmlspecialchars($search); ?>">
                     </div>
-                </div>
+                    <div class="col-md-4 mb-2">
+                        <select name="category_id" class="form-select">
+                            <option value="">All Categories</option>
+                            <?php foreach ($categories as $category): ?>
+                                <option value="<?php echo $category['id']; ?>" <?php echo $category_id == $category['id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($category['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button type="submit" class="btn btn-outline-danger me-2">
+                            <i class="fas fa-search me-1"></i> Filter
+                        </button>
+                        <a href="inventory.php" class="btn btn-outline-secondary">
+                            <i class="fas fa-redo me-1"></i> Reset
+                        </a>
+                    </div>
+                </form>
                 
                 <!-- Products Table -->
                 <div class="table-responsive">
@@ -125,6 +149,7 @@ ob_start();
                         <thead class="table-danger">
                             <tr>
                                 <th>Product Name</th>
+                                <th>Category</th>
                                 <th>SKU</th>
                                 <th>Barcode</th>
                                 <th>Price</th>
@@ -136,7 +161,7 @@ ob_start();
                         <tbody>
                             <?php if (empty($products)): ?>
                             <tr>
-                                <td colspan="7" class="text-center py-4">
+                                <td colspan="8" class="text-center py-4">
                                     <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
                                     <p class="text-muted">No products found</p>
                                 </td>
@@ -147,6 +172,7 @@ ob_start();
                                 <td>
                                     <strong><?php echo htmlspecialchars($product['name']); ?></strong>
                                 </td>
+                                <td><span class="badge bg-info"><?php echo htmlspecialchars($product['category_name'] ?? 'N/A'); ?></span></td>
                                 <td>SKU-<?php echo str_pad($product['id'], 4, '0', STR_PAD_LEFT); ?></td>
                                 <td><?php echo htmlspecialchars($product['barcode']); ?></td>
                                 <td><?php echo formatCurrency($product['price']); ?></td>
