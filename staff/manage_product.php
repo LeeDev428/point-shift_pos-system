@@ -10,11 +10,37 @@ $db = Database::getInstance()->getConnection();
 // Fetch categories for dropdown
 $categories = $db->query("SELECT id, name FROM categories ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
+// Get search and filter parameters
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+$category_filter = isset($_GET['category_id']) ? intval($_GET['category_id']) : 0;
+
 // Pagination setup
 $perPage = 10;
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $offset = ($page - 1) * $perPage;
-$totalProducts = $db->query("SELECT COUNT(*) FROM products")->fetchColumn();
+
+// Build WHERE clause
+$whereConditions = [];
+$params = [];
+
+if (!empty($search)) {
+    $whereConditions[] = "(p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ?)";
+    $params[] = "%$search%";
+    $params[] = "%$search%";
+    $params[] = "%$search%";
+}
+
+if ($category_filter > 0) {
+    $whereConditions[] = "p.category_id = ?";
+    $params[] = $category_filter;
+}
+
+$whereClause = !empty($whereConditions) ? "WHERE " . implode(" AND ", $whereConditions) : "";
+
+// Count total products with filters
+$countStmt = $db->prepare("SELECT COUNT(*) FROM products p $whereClause");
+$countStmt->execute($params);
+$totalProducts = $countStmt->fetchColumn();
 $totalPages = ceil($totalProducts / $perPage);
 
 // Add product
@@ -37,12 +63,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add'])) {
 
 // Update product
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
+    $product_id = intval($_POST['id']);
+    $new_stock = intval($_POST['stock_quantity']);
+    $user_id = $_SESSION['user_id'];
+    
+    // Get old stock quantity to track changes
+    $oldStockStmt = $db->prepare("SELECT stock_quantity, name FROM products WHERE id = ?");
+    $oldStockStmt->execute([$product_id]);
+    $oldProduct = $oldStockStmt->fetch(PDO::FETCH_ASSOC);
+    $old_stock = intval($oldProduct['stock_quantity']);
+    $product_name = $oldProduct['name'];
+    
+    // Calculate stock change
+    $stock_change = $new_stock - $old_stock;
+    
+    // Update product
     $expiry = !empty($_POST['expiry']) ? $_POST['expiry'] : null;
-    $stmt = $db->prepare("UPDATE products SET name=?, sku=?, category_id=?, price=?, stock_quantity=?, low_stock_threshold=?, barcode=?, expiry=?, status=? WHERE id=?");
+    $stmt = $db->prepare("UPDATE products SET name=?, sku=?, category_id=?, price=?, stock_quantity=?, low_stock_threshold=?, barcode=?, expiry=?, status=?, last_updated_by=? WHERE id=?");
     $stmt->execute([
-        $_POST['name'], $_POST['sku'], $_POST['category_id'], $_POST['price'], $_POST['stock_quantity'], $_POST['low_stock_threshold'],
-        $_POST['barcode'], $expiry, $_POST['status'], $_POST['id']
+        $_POST['name'], $_POST['sku'], $_POST['category_id'], $_POST['price'], $new_stock, $_POST['low_stock_threshold'],
+        $_POST['barcode'], $expiry, $_POST['status'], $user_id, $product_id
     ]);
+    
+    // Record inventory change in inventory_reports if stock quantity changed
+    if ($stock_change != 0) {
+        $change_type = ($stock_change > 0) ? 'Added' : 'Removed';
+        $quantity_changed = abs($stock_change);
+        $remarks = ($stock_change > 0) 
+            ? "Stock added by staff. Previous: $old_stock, New: $new_stock" 
+            : "Stock removed by staff. Previous: $old_stock, New: $new_stock";
+        
+        $reportStmt = $db->prepare("INSERT INTO inventory_reports (product_id, change_type, quantity, quantity_changed, previous_quantity, new_quantity, date, remarks, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, NOW())");
+        $reportStmt->execute([
+            $product_id,
+            $change_type,
+            $quantity_changed,  // Use same value for 'quantity' (legacy column)
+            $quantity_changed,
+            $old_stock,
+            $new_stock,
+            $remarks,
+            $user_id
+        ]);
+    }
+    
     header('Location: manage_product.php');
     exit();
 }
@@ -62,7 +125,10 @@ $stats = [
     'total_value' => $db->query("SELECT SUM(price) FROM products")->fetchColumn(),
 ];
 
-$products = $db->query("SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id ORDER BY p.id DESC LIMIT $perPage OFFSET $offset")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch products with filters
+$productsStmt = $db->prepare("SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id $whereClause ORDER BY p.id DESC LIMIT $perPage OFFSET $offset");
+$productsStmt->execute($params);
+$products = $productsStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Set page title for layout
 $title = 'Inventory';
@@ -177,6 +243,35 @@ ob_start();
       </div>
     </div>
 
+    <!-- Search and Filter Form -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-5">
+                    <input type="text" name="search" class="form-control" placeholder="Search by Name, SKU or Barcode" value="<?php echo htmlspecialchars($search); ?>">
+                </div>
+                <div class="col-md-4">
+                    <select name="category_id" class="form-select">
+                        <option value="0">All Categories</option>
+                        <?php foreach ($categories as $category): ?>
+                            <option value="<?php echo $category['id']; ?>" <?php echo $category_filter == $category['id'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($category['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-search me-1"></i> Filter
+                    </button>
+                    <a href="manage_product.php" class="btn btn-secondary">
+                        <i class="fas fa-redo me-1"></i> Reset
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <table class="table table-bordered table-sm">
         <thead>
             <tr>
@@ -206,9 +301,17 @@ ob_start();
     <!-- Pagination -->
     <nav aria-label="Product pagination">
       <ul class="pagination justify-content-center mt-3">
-        <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+        <?php 
+        $queryParams = [];
+        if (!empty($search)) $queryParams['search'] = $search;
+        if ($category_filter > 0) $queryParams['category_id'] = $category_filter;
+        
+        for ($i = 1; $i <= $totalPages; $i++): 
+            $queryParams['page'] = $i;
+            $queryString = http_build_query($queryParams);
+        ?>
           <li class="page-item<?=($i == $page ? ' active' : '')?>">
-            <a class="page-link" href="?page=<?=$i?>"><?=$i?></a>
+            <a class="page-link" href="?<?=$queryString?>"><?=$i?></a>
           </li>
         <?php endfor; ?>
       </ul>
