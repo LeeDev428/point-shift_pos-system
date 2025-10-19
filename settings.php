@@ -59,6 +59,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message_type = "success";
     }
     
+    // GCash QR Code Upload
+    if ($action === 'upload_gcash_qr') {
+        if (isset($_FILES['gcash_qr']) && $_FILES['gcash_qr']['error'] === UPLOAD_ERR_OK) {
+            $upload_dir = 'uploads/qrcodes/';
+            if (!is_dir($upload_dir)) {
+                mkdir($upload_dir, 0777, true);
+            }
+            
+            $file_extension = pathinfo($_FILES['gcash_qr']['name'], PATHINFO_EXTENSION);
+            $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
+            
+            if (in_array(strtolower($file_extension), $allowed_extensions)) {
+                $new_filename = 'gcash_qr_' . time() . '.' . $file_extension;
+                $upload_path = $upload_dir . $new_filename;
+                
+                if (move_uploaded_file($_FILES['gcash_qr']['tmp_name'], $upload_path)) {
+                    // Insert or update in payment_qrcodes table
+                    $stmt = $conn->prepare("INSERT INTO payment_qrcodes (payment_method, qr_code_path, description, is_active) VALUES ('gcash', ?, 'GCash Payment QR Code', 1) ON DUPLICATE KEY UPDATE qr_code_path = ?, updated_at = CURRENT_TIMESTAMP");
+                    $stmt->bind_param("ss", $upload_path, $upload_path);
+                    $stmt->execute();
+                    
+                    $message = "GCash QR code uploaded successfully!";
+                    $message_type = "success";
+                } else {
+                    $message = "Error uploading QR code!";
+                    $message_type = "danger";
+                }
+            } else {
+                $message = "Invalid file type! Only JPG, PNG, and GIF allowed.";
+                $message_type = "danger";
+            }
+        } else {
+            $message = "Please select a QR code image to upload.";
+            $message_type = "warning";
+        }
+    }
+    
+    // Delete GCash QR Code
+    if ($action === 'delete_gcash_qr') {
+        $stmt = $conn->prepare("SELECT qr_code_path FROM payment_qrcodes WHERE payment_method = 'gcash' AND is_active = 1 LIMIT 1");
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($row = $result->fetch_assoc()) {
+            if (file_exists($row['qr_code_path'])) {
+                unlink($row['qr_code_path']);
+            }
+            
+            $stmt = $conn->prepare("UPDATE payment_qrcodes SET qr_code_path = '', is_active = 0 WHERE payment_method = 'gcash'");
+            $stmt->execute();
+            
+            $message = "GCash QR code deleted successfully!";
+            $message_type = "success";
+        }
+    }
+    
     // User Management Actions (from user_management.php)
     if ($action === 'create_user') {
         $username = trim($_POST['username']);
@@ -238,6 +294,11 @@ $store_settings = [];
 while ($row = $settings_query->fetch_assoc()) {
     $store_settings[$row['setting_key']] = $row['setting_value'];
 }
+
+// Fetch GCash QR Code
+$gcash_qr_query = $conn->query("SELECT qr_code_path FROM payment_qrcodes WHERE payment_method = 'gcash' AND is_active = 1 LIMIT 1");
+$gcash_qr = $gcash_qr_query->fetch_assoc();
+$gcash_qr_path = $gcash_qr['qr_code_path'] ?? '';
 
 // Fetch users
 $users = $conn->query("SELECT u.*, 
@@ -452,6 +513,52 @@ ob_start();
                 </button>
             </div>
         </form>
+        
+        <!-- GCash QR Code Section -->
+        <div class="card mt-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-qrcode me-2"></i>GCash Payment QR Code</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Upload a GCash QR code that will be displayed when customers select GCash as payment method in POS.</p>
+                
+                <?php if (!empty($gcash_qr_path) && file_exists($gcash_qr_path)): ?>
+                    <!-- Current QR Code Display -->
+                    <div class="alert alert-success">
+                        <h6><i class="fas fa-check-circle me-2"></i>QR Code Uploaded</h6>
+                        <div class="text-center my-3">
+                            <img src="<?php echo htmlspecialchars($gcash_qr_path); ?>" alt="GCash QR Code" class="img-thumbnail" style="max-width: 300px; max-height: 300px;">
+                        </div>
+                        <form method="POST" class="d-inline">
+                            <input type="hidden" name="action" value="delete_gcash_qr">
+                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete the GCash QR code?')">
+                                <i class="fas fa-trash me-1"></i>Delete QR Code
+                            </button>
+                        </form>
+                    </div>
+                <?php else: ?>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>No GCash QR code uploaded yet.
+                    </div>
+                <?php endif; ?>
+                
+                <!-- Upload Form -->
+                <form method="POST" enctype="multipart/form-data" class="mt-3">
+                    <input type="hidden" name="action" value="upload_gcash_qr">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <input type="file" class="form-control" name="gcash_qr" accept="image/*" required>
+                            <small class="form-text text-muted">Accepted formats: JPG, PNG, GIF. Max size: 5MB</small>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-upload me-2"></i><?php echo !empty($gcash_qr_path) ? 'Replace' : 'Upload'; ?> QR Code
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
     
     <!-- User Management Tab -->
