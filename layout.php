@@ -176,7 +176,7 @@ requireLogin();
                 <li class="nav-item">
                     <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : ''; ?>" href="reports.php">
                         <i class="fas fa-chart-line"></i>
-                        Reports
+                        Inventory Reports
                     </a>
                 </li>
                 
