@@ -207,12 +207,12 @@
                     </a>
                 </li>
               
-                <li class="nav-item">
+                <!-- <li class="nav-item">
                     <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'sales.php' ? 'active' : ''; ?>" href="sales.php">
                         <i class="fas fa-chart-line"></i>
                         Daily Sales
                     </a>
-                </li>
+                </li> -->
                 <li class="nav-item">
                     <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'email.php' ? 'active' : ''; ?>" href="email.php">
                         <i class="fas fa-envelope"></i>
