@@ -275,7 +275,7 @@ ob_start();
     <table class="table table-bordered table-sm">
         <thead>
             <tr>
-                <th>Name</th><th>SKU</th><th>Category</th><th>Price</th><th>Stock Qty</th><th>Low Stock Threshold</th><th>Barcode</th><th>Expiry</th><th>Status</th><th>Actions</th>
+                <th>Name</th><th>SKU</th><th>Category</th><th>Price</th><th>Stock Qty</th><th>Low Stock Threshold</th><th>Barcode</th><th>Expiry</th><th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -289,7 +289,7 @@ ob_start();
                 <td><?=$p['low_stock_threshold']?></td>
                 <td><?=htmlspecialchars($p['barcode'] ?? '')?></td>
                 <td><?=htmlspecialchars($p['expiry'] ?? '')?></td>
-                <td><?=htmlspecialchars($p['status'] ?? '')?></td>
+                <!-- <td><?=htmlspecialchars($p['status'] ?? '')?></td> -->
                 <td>
                     <button class="btn btn-primary btn-sm" onclick="editProduct(<?=htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8')?>)">Edit</button>
                     <a href="?delete=<?=$p['id']?>" class="btn btn-danger btn-sm" onclick="return confirm('Delete?')">Delete</a>
