@@ -51,7 +51,7 @@ class ProductService {
   }
 
   // Get all products
-  async getAllProducts() {
+  async getAll() {
     try {
       const response = await axios.get(API_ENDPOINTS.PRODUCTS, {
         params: {
@@ -60,17 +60,77 @@ class ProductService {
       });
 
       if (response.data.success) {
-        return { success: true, products: response.data.products };
+        return response.data.products;
       } else {
-        return { success: false, message: response.data.message };
+        throw new Error(response.data.message);
       }
     } catch (error) {
       console.error('Get all products error:', error);
-      return { 
-        success: false, 
-        message: error.response?.data?.message || 'Network error. Please check your connection.' 
-      };
+      throw error;
     }
+  }
+
+  // Add new product
+  async addProduct(productData) {
+    try {
+      const response = await axios.post(API_ENDPOINTS.PRODUCTS, {
+        action: 'add',
+        ...productData
+      });
+
+      if (response.data.success) {
+        return response.data;
+      } else {
+        throw new Error(response.data.message);
+      }
+    } catch (error) {
+      console.error('Add product error:', error);
+      throw error;
+    }
+  }
+
+  // Update product
+  async updateProduct(productId, productData) {
+    try {
+      const response = await axios.post(API_ENDPOINTS.PRODUCTS, {
+        action: 'update',
+        id: productId,
+        ...productData
+      });
+
+      if (response.data.success) {
+        return response.data;
+      } else {
+        throw new Error(response.data.message);
+      }
+    } catch (error) {
+      console.error('Update product error:', error);
+      throw error;
+    }
+  }
+
+  // Delete product
+  async deleteProduct(productId) {
+    try {
+      const response = await axios.post(API_ENDPOINTS.PRODUCTS, {
+        action: 'delete',
+        id: productId
+      });
+
+      if (response.data.success) {
+        return response.data;
+      } else {
+        throw new Error(response.data.message);
+      }
+    } catch (error) {
+      console.error('Delete product error:', error);
+      throw error;
+    }
+  }
+
+  // Legacy method - keep for backward compatibility
+  async getAllProducts() {
+    return this.getAll();
   }
 }
 
