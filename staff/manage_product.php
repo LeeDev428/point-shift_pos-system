@@ -15,7 +15,7 @@ $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $category_filter = isset($_GET['category_id']) ? intval($_GET['category_id']) : 0;
 
 // Pagination setup
-$perPage = 10;
+$perPage = 15;
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $offset = ($page - 1) * $perPage;
 
@@ -130,12 +130,71 @@ $productsStmt = $db->prepare("SELECT p.*, c.name AS category_name FROM products 
 $productsStmt->execute($params);
 $products = $productsStmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Get expiring products (within 7 days) and expired products
+$expiringProducts = [];
+$expiredProducts = [];
+foreach ($products as $product) {
+    if (!empty($product['expiry'])) {
+        $expiryDate = new DateTime($product['expiry']);
+        $today = new DateTime();
+        $interval = $today->diff($expiryDate);
+        $daysUntilExpiry = (int)$interval->format('%R%a'); // +/- days
+        
+        if ($daysUntilExpiry < 0) {
+            // Already expired
+            $expiredProducts[] = $product;
+        } elseif ($daysUntilExpiry <= 7) {
+            // Expiring within 7 days
+            $expiringProducts[] = $product;
+        }
+    }
+}
+
 // Set page title for layout
 $title = 'Inventory';
 ob_start();
 ?>
 <div class="container py-4" style="max-height: 90vh; overflow-y: auto;">
     <h2>Inventory</h2>
+
+    <!-- Expiry Alerts -->
+    <?php if (!empty($expiredProducts)): ?>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <h5 class="alert-heading"><i class="fas fa-times-circle me-2"></i>Expired Products!</h5>
+        <p class="mb-2">The following products have expired. Please remove from display immediately:</p>
+        <ul class="mb-0">
+            <?php foreach ($expiredProducts as $product): ?>
+                <li>
+                    <strong><?php echo htmlspecialchars($product['name']); ?></strong> 
+                    expired on <strong><?php echo date('M d, Y', strtotime($product['expiry'])); ?></strong>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($expiringProducts)): ?>
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <h5 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Products Nearing Expiration</h5>
+        <p class="mb-2">The following products will expire soon:</p>
+        <ul class="mb-0">
+            <?php foreach ($expiringProducts as $product): ?>
+                <?php
+                    $expiryDate = new DateTime($product['expiry']);
+                    $today = new DateTime();
+                    $daysLeft = (int)$today->diff($expiryDate)->format('%a');
+                ?>
+                <li>
+                    <strong><?php echo htmlspecialchars($product['name']); ?></strong> 
+                    will expire on <strong><?php echo date('M d, Y', strtotime($product['expiry'])); ?></strong>
+                    (<?php echo $daysLeft; ?> day<?php echo $daysLeft != 1 ? 's' : ''; ?> remaining)
+                </li>
+            <?php endforeach; ?>
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <?php endif; ?>
 
     <!-- Statistics Cards -->
     <div class="row mb-4">
@@ -279,16 +338,51 @@ ob_start();
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($products as $p): ?>
-            <tr>
+            <?php foreach ($products as $p): 
+                // Calculate expiry status
+                $expiryClass = '';
+                $expiryBadge = '';
+                $expiryText = 'N/A';
+                if (!empty($p['expiry'])) {
+                    $expiryDate = new DateTime($p['expiry']);
+                    $today = new DateTime();
+                    $interval = $today->diff($expiryDate);
+                    $daysUntilExpiry = (int)$interval->format('%R%a');
+                    
+                    $expiryText = date('M d, Y', strtotime($p['expiry']));
+                    
+                    if ($daysUntilExpiry < 0) {
+                        // Expired
+                        $expiryClass = 'table-danger';
+                        $expiryBadge = '<span class="badge bg-danger ms-2">EXPIRED</span>';
+                    } elseif ($daysUntilExpiry <= 7) {
+                        // Expiring soon
+                        $expiryClass = 'table-warning';
+                        $expiryBadge = '<span class="badge bg-warning text-dark ms-2">' . $daysUntilExpiry . ' days left</span>';
+                    }
+                }
+            ?>
+            <tr class="<?php echo $expiryClass; ?>">
                 <td><?=htmlspecialchars($p['name'] ?? '')?></td>
                 <td><?=htmlspecialchars($p['sku'] ?? '')?></td>
                 <td><?=htmlspecialchars($p['category_name'] ?? '')?></td>
                 <td>₱<?=number_format($p['price'],2)?></td>
                 <td><?=$p['stock_quantity']?></td>
                 <td><?=$p['low_stock_threshold']?></td>
-                <td><?=htmlspecialchars($p['barcode'] ?? '')?></td>
-                <td><?=htmlspecialchars($p['expiry'] ?? '')?></td>
+                <td>
+                    <div class="d-flex align-items-center gap-2">
+                        <span><?=htmlspecialchars($p['barcode'] ?? 'N/A')?></span>
+                        <?php if (!empty($p['barcode'])): ?>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="showBarcode('<?=htmlspecialchars($p['barcode'])?>', '<?=htmlspecialchars($p['name'])?>')" title="Show Barcode">
+                                <i class="fas fa-barcode"></i>
+                            </button>
+                        <?php endif; ?>
+                    </div>
+                </td>
+                <td>
+                    <?php echo $expiryText; ?>
+                    <?php echo $expiryBadge; ?>
+                </td>
                 <!-- <td><?=htmlspecialchars($p['status'] ?? '')?></td> -->
                 <td>
                     <button class="btn btn-primary btn-sm" onclick="editProduct(<?=htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8')?>)">Edit</button>
@@ -359,7 +453,65 @@ ob_start();
             }
         });
     }
+
+    // Show barcode in modal
+    function showBarcode(barcode, productName) {
+        document.getElementById('barcodeValue').textContent = barcode;
+        document.getElementById('productNameDisplay').textContent = productName;
+        document.getElementById('barcodeImage').src = 'https://barcode.tec-it.com/barcode.ashx?data=' + encodeURIComponent(barcode) + '&code=Code128&translate-esc=on&unit=Fit&dpi=96&imagetype=Gif&rotation=0&color=%23000000&bgcolor=%23ffffff&qunit=Mm&quiet=0';
+        
+        const modal = new bootstrap.Modal(document.getElementById('barcodeModal'));
+        modal.show();
+    }
+
+    // Print barcode
+    function printBarcode() {
+        const printWindow = window.open('', '', 'height=400,width=600');
+        const barcodeImg = document.getElementById('barcodeImage').src;
+        const productName = document.getElementById('productNameDisplay').textContent;
+        const barcodeValue = document.getElementById('barcodeValue').textContent;
+        
+        printWindow.document.write('<html><head><title>Print Barcode</title>');
+        printWindow.document.write('<style>body{text-align:center;padding:20px;font-family:Arial;}img{max-width:100%;}</style>');
+        printWindow.document.write('</head><body>');
+        printWindow.document.write('<h3>' + productName + '</h3>');
+        printWindow.document.write('<img src="' + barcodeImg + '" />');
+        printWindow.document.write('<p style="margin-top:10px;font-size:14px;">' + barcodeValue + '</p>');
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.print();
+    }
     </script>
+
+    <!-- Barcode Display Modal -->
+    <div class="modal fade" id="barcodeModal" tabindex="-1" aria-labelledby="barcodeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="barcodeModalLabel">
+                        <i class="fas fa-barcode me-2"></i>Product Barcode
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <h6 class="mb-3" id="productNameDisplay"></h6>
+                    <div class="p-3 bg-light rounded mb-3">
+                        <img id="barcodeImage" src="" alt="Barcode" class="img-fluid" style="max-height: 150px;">
+                    </div>
+                    <p class="text-muted mb-0">Barcode: <strong id="barcodeValue"></strong></p>
+                    <p class="text-info small mt-2">
+                        <i class="fas fa-mobile-alt me-1"></i>Scan this barcode with your mobile app
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-danger" onclick="printBarcode()">
+                        <i class="fas fa-print me-1"></i>Print
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 <?php
 $content = ob_get_clean();
