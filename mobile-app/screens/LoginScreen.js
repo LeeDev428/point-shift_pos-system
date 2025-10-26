@@ -26,7 +26,7 @@ export default function LoginScreen({ navigation }) {
   const checkAuth = async () => {
     const isAuth = await AuthService.isAuthenticated();
     if (isAuth) {
-      navigation.replace('Scanner');
+      navigation.replace('Main');
     }
   };
 
@@ -44,7 +44,7 @@ export default function LoginScreen({ navigation }) {
       Alert.alert('Success', 'Login successful!', [
         {
           text: 'OK',
-          onPress: () => navigation.replace('Scanner'),
+          onPress: () => navigation.replace('Main'),
         },
       ]);
     } else {
