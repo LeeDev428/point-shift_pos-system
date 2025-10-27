@@ -195,6 +195,12 @@
                         Email Admin
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'inventory.php' ? 'active' : ''; ?>" href="inventory.php">
+                        <i class="fas fa-eye"></i>
+                        View Inventory
+                    </a>
+                </li>
                 <!-- <li class="nav-item">
                     <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'view_shifts.php' ? 'active' : ''; ?>" href="view_shifts.php">
                         <i class="fas fa-calendar-alt"></i>
@@ -256,7 +262,7 @@
         </nav>
 
         <!-- Page Content -->
-        <div class="container-fluid pos-container">
+        <div class="<?php echo basename($_SERVER['PHP_SELF']) == 'pos.php' ? 'container-fluid pos-container' : 'container-fluid py-4'; ?>">
             <?php echo $content; ?>
         </div>
     </div>
