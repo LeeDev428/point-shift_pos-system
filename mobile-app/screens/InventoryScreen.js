@@ -15,12 +15,15 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import productService from '../services/productService';
+import categoryService from '../services/categoryService';
 
 const InventoryScreen = ({ route, navigation }) => {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,12 +44,27 @@ const InventoryScreen = ({ route, navigation }) => {
   });
 
   useEffect(() => {
+    loadCategories();
     loadProducts();
   }, []);
 
   useEffect(() => {
     filterProducts();
   }, [products, searchQuery, filter]);
+
+  const loadCategories = async () => {
+    try {
+      const response = await categoryService.getAll();
+      if (response.success && response.data) {
+        setCategories(response.data);
+      } else {
+        setCategories([]);
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      setCategories([]);
+    }
+  };
 
   const loadProducts = async () => {
     try {
@@ -135,6 +153,8 @@ const InventoryScreen = ({ route, navigation }) => {
       low_stock_threshold: product.low_stock_threshold?.toString() || '10',
       expiry: product.expiry || '',
       status: product.status || 'active',
+      // Ensure Picker selectedValue matches type (string)
+      category_id: product.category_id ? String(product.category_id) : '',
     });
     setModalVisible(true);
   };
@@ -153,6 +173,13 @@ const InventoryScreen = ({ route, navigation }) => {
         low_stock_threshold: parseInt(currentProduct.low_stock_threshold || 10),
         expiry: currentProduct.expiry || null,
       };
+
+      // Normalize category_id: send integer or null
+      if (currentProduct.category_id === '' || currentProduct.category_id === null || currentProduct.category_id === undefined) {
+        productData.category_id = null;
+      } else {
+        productData.category_id = parseInt(currentProduct.category_id);
+      }
 
       if (editMode) {
         await productService.updateProduct(currentProduct.id, productData);
@@ -447,10 +474,51 @@ const InventoryScreen = ({ route, navigation }) => {
                   />
                 </View>
                 <View style={styles.formColumnHalf}>
-                  <Text style={styles.inputLabel}>Category</Text>
-                  <View style={styles.input}>
-                    <Text style={{ color: '#999' }}>Select Category</Text>
-                  </View>
+                  <Text style={styles.inputLabel}>Category *</Text>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={currentProduct.category_id || ''}
+                      onChange={(e) => {
+                        console.log('Category changed to:', e.target.value);
+                        setCurrentProduct({ ...currentProduct, category_id: e.target.value });
+                      }}
+                      style={{
+                        borderWidth: 1,
+                        borderColor: '#ddd',
+                        borderRadius: 8,
+                        padding: 12,
+                        fontSize: 15,
+                        backgroundColor: '#fff',
+                        height: 48,
+                        width: '100%',
+                      }}
+                    >
+                      <option value="">Select Category</option>
+                      {categories && categories.length > 0 && categories.map((cat) => (
+                        <option key={cat.id} value={cat.id.toString()}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Picker
+                      selectedValue={currentProduct.category_id || ''}
+                      onValueChange={(itemValue) => {
+                        console.log('Category changed to:', itemValue);
+                        setCurrentProduct({ ...currentProduct, category_id: itemValue });
+                      }}
+                      style={styles.pickerInput}
+                    >
+                      <Picker.Item label="Select Category" value="" />
+                      {categories && categories.length > 0 && categories.map((cat) => (
+                        <Picker.Item 
+                          key={cat.id} 
+                          label={cat.name} 
+                          value={cat.id.toString()} 
+                        />
+                      ))}
+                    </Picker>
+                  )}
                 </View>
               </View>
 
@@ -459,10 +527,11 @@ const InventoryScreen = ({ route, navigation }) => {
                   <Text style={styles.inputLabel}>Price *</Text>
                   <TextInput
                     style={styles.input}
-                    value={currentProduct.price.toString()}
-                    onChangeText={(text) =>
-                      setCurrentProduct({ ...currentProduct, price: text })
-                    }
+                    value={currentProduct.price !== null && currentProduct.price !== undefined ? String(currentProduct.price) : ''}
+                    onChangeText={(text) => {
+                      console.log('Price changed:', text);
+                      setCurrentProduct({ ...currentProduct, price: text });
+                    }}
                     placeholder="Price"
                     keyboardType="decimal-pad"
                   />
@@ -471,10 +540,11 @@ const InventoryScreen = ({ route, navigation }) => {
                   <Text style={styles.inputLabel}>Quantity *</Text>
                   <TextInput
                     style={styles.input}
-                    value={currentProduct.stock_quantity.toString()}
-                    onChangeText={(text) =>
-                      setCurrentProduct({ ...currentProduct, stock_quantity: text })
-                    }
+                    value={currentProduct.stock_quantity !== null && currentProduct.stock_quantity !== undefined ? String(currentProduct.stock_quantity) : ''}
+                    onChangeText={(text) => {
+                      console.log('Quantity changed:', text);
+                      setCurrentProduct({ ...currentProduct, stock_quantity: text });
+                    }}
                     placeholder="Quantity"
                     keyboardType="number-pad"
                   />
@@ -530,12 +600,41 @@ const InventoryScreen = ({ route, navigation }) => {
                   )}
                 </View>
                 <View style={styles.formColumnHalf}>
-                  <Text style={styles.inputLabel}>Status</Text>
-                  <View style={styles.input}>
-                    <Text style={{ color: '#333' }}>
-                      {currentProduct.status === 'active' ? 'Active' : 'Inactive'}
-                    </Text>
-                  </View>
+                  <Text style={styles.inputLabel}>Status *</Text>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={currentProduct.status || 'active'}
+                      onChange={(e) => {
+                        console.log('Status changed to:', e.target.value);
+                        setCurrentProduct({ ...currentProduct, status: e.target.value });
+                      }}
+                      style={{
+                        borderWidth: 1,
+                        borderColor: '#ddd',
+                        borderRadius: 8,
+                        padding: 12,
+                        fontSize: 15,
+                        backgroundColor: '#fff',
+                        height: 48,
+                        width: '100%',
+                      }}
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  ) : (
+                    <Picker
+                      selectedValue={currentProduct.status || 'active'}
+                      onValueChange={(itemValue) => {
+                        console.log('Status changed to:', itemValue);
+                        setCurrentProduct({ ...currentProduct, status: itemValue });
+                      }}
+                      style={styles.pickerInput}
+                    >
+                      <Picker.Item label="Active" value="active" />
+                      <Picker.Item label="Inactive" value="inactive" />
+                    </Picker>
+                  )}
                 </View>
               </View>
 
@@ -798,6 +897,26 @@ const styles = StyleSheet.create({
     fontSize: 15,
     backgroundColor: '#fff',
     color: '#333',
+  },
+  pickerInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    height: 48,
+    fontSize: 15,
+    color: '#333',
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+  },
+  picker: {
+    height: 50,
+    width: '100%',
   },
   dateInput: {
     flexDirection: 'row',
