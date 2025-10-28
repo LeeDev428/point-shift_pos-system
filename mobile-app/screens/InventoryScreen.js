@@ -29,19 +29,7 @@ const InventoryScreen = ({ route, navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState(route.params?.filter || 'all');
   const [modalVisible, setModalVisible] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [currentProduct, setCurrentProduct] = useState({
-    name: '',
-    sku: '',
-    category_id: '1',
-    price: '',
-    stock_quantity: '',
-    low_stock_threshold: '10',
-    barcode: '',
-    expiry: '',
-    status: 'active',
-  });
+  const [currentProduct, setCurrentProduct] = useState(null);
 
   useEffect(() => {
     loadCategories();
@@ -126,6 +114,16 @@ const InventoryScreen = ({ route, navigation }) => {
   const onRefresh = () => {
     setRefreshing(true);
     loadProducts();
+  };
+
+  const viewProductDetails = (product) => {
+    setCurrentProduct(product);
+    setModalVisible(true);
+  };
+
+  const getCategoryName = (categoryId) => {
+    const category = categories.find(c => c.id === parseInt(categoryId));
+    return category ? category.name : 'Uncategorized';
   };
 
   const openAddModal = () => {
@@ -264,13 +262,11 @@ const InventoryScreen = ({ route, navigation }) => {
     const hasAlert = item.stock_quantity <= 10 || expiryStatus;
 
     return (
-      <TouchableOpacity
+      <View
         style={[
           styles.productCard,
           hasAlert && styles.productCardAlert,
         ]}
-        onPress={() => openEditModal(item)}
-        activeOpacity={0.7}
       >
         <View style={styles.productHeader}>
           <View style={styles.productInfo}>
@@ -281,11 +277,11 @@ const InventoryScreen = ({ route, navigation }) => {
               </Text>
             )}
           </View>
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => handleDelete(item)}
+          <TouchableOpacity 
+            style={styles.readOnlyBadge}
+            onPress={() => viewProductDetails(item)}
           >
-            <Ionicons name="trash-outline" size={20} color="#dc3545" />
+            <Ionicons name="eye-outline" size={16} color="#6c757d" />
           </TouchableOpacity>
         </View>
 
@@ -329,7 +325,7 @@ const InventoryScreen = ({ route, navigation }) => {
             </View>
           )}
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -356,9 +352,10 @@ const InventoryScreen = ({ route, navigation }) => {
           />
         </View>
 
-        <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
-          <Ionicons name="add" size={24} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.readOnlyIndicator}>
+          <Ionicons name="eye-outline" size={20} color="#6c757d" />
+          <Text style={styles.readOnlyText}>View Only</Text>
+        </View>
       </View>
 
       {/* Filter Buttons */}
@@ -424,241 +421,151 @@ const InventoryScreen = ({ route, navigation }) => {
         }
       />
 
-      {/* Add/Edit Modal */}
+      {/* View Product Details Modal */}
       <Modal
-        visible={modalVisible}
         animationType="slide"
         transparent={false}
+        visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editMode ? 'Edit Product' : 'Add New Product'}
-              </Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={28} color="#fff" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              <View style={styles.formRow}>
-                <View style={styles.formColumn}>
-                  <Text style={styles.inputLabel}>Product Name *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={currentProduct.name}
-                    onChangeText={(text) =>
-                      setCurrentProduct({ ...currentProduct, name: text })
-                    }
-                    placeholder="Product Name"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.formRow}>
-                <View style={styles.formColumnHalf}>
-                  <Text style={styles.inputLabel}>SKU</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={currentProduct.sku || ''}
-                    onChangeText={(text) =>
-                      setCurrentProduct({ ...currentProduct, sku: text })
-                    }
-                    placeholder="SKU"
-                    editable={!editMode}
-                  />
-                </View>
-                <View style={styles.formColumnHalf}>
-                  <Text style={styles.inputLabel}>Category *</Text>
-                  {Platform.OS === 'web' ? (
-                    <select
-                      value={currentProduct.category_id || ''}
-                      onChange={(e) => {
-                        console.log('Category changed to:', e.target.value);
-                        setCurrentProduct({ ...currentProduct, category_id: e.target.value });
-                      }}
-                      style={{
-                        borderWidth: 1,
-                        borderColor: '#ddd',
-                        borderRadius: 8,
-                        padding: 12,
-                        fontSize: 15,
-                        backgroundColor: '#fff',
-                        height: 48,
-                        width: '100%',
-                      }}
-                    >
-                      <option value="">Select Category</option>
-                      {categories && categories.length > 0 && categories.map((cat) => (
-                        <option key={cat.id} value={cat.id.toString()}>
-                          {cat.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <Picker
-                      selectedValue={currentProduct.category_id || ''}
-                      onValueChange={(itemValue) => {
-                        console.log('Category changed to:', itemValue);
-                        setCurrentProduct({ ...currentProduct, category_id: itemValue });
-                      }}
-                      style={styles.pickerInput}
-                    >
-                      <Picker.Item label="Select Category" value="" />
-                      {categories && categories.length > 0 && categories.map((cat) => (
-                        <Picker.Item 
-                          key={cat.id} 
-                          label={cat.name} 
-                          value={cat.id.toString()} 
-                        />
-                      ))}
-                    </Picker>
-                  )}
-                </View>
-              </View>
-
-              <View style={styles.formRow}>
-                <View style={styles.formColumnHalf}>
-                  <Text style={styles.inputLabel}>Price *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={currentProduct.price !== null && currentProduct.price !== undefined ? String(currentProduct.price) : ''}
-                    onChangeText={(text) => {
-                      console.log('Price changed:', text);
-                      setCurrentProduct({ ...currentProduct, price: text });
-                    }}
-                    placeholder="Price"
-                    keyboardType="decimal-pad"
-                  />
-                </View>
-                <View style={styles.formColumnHalf}>
-                  <Text style={styles.inputLabel}>Quantity *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={currentProduct.stock_quantity !== null && currentProduct.stock_quantity !== undefined ? String(currentProduct.stock_quantity) : ''}
-                    onChangeText={(text) => {
-                      console.log('Quantity changed:', text);
-                      setCurrentProduct({ ...currentProduct, stock_quantity: text });
-                    }}
-                    placeholder="Quantity"
-                    keyboardType="number-pad"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.formRow}>
-                <View style={styles.formColumnHalf}>
-                  <Text style={styles.inputLabel}>Barcode</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={currentProduct.barcode || ''}
-                    onChangeText={(text) =>
-                      setCurrentProduct({ ...currentProduct, barcode: text })
-                    }
-                    placeholder="Barcode"
-                  />
-                </View>
-                <View style={styles.formColumnHalf}>
-                  <Text style={styles.inputLabel}>Low Stock Threshold</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={currentProduct.low_stock_threshold?.toString() || '10'}
-                    onChangeText={(text) =>
-                      setCurrentProduct({ ...currentProduct, low_stock_threshold: text })
-                    }
-                    placeholder="Low Stock Threshold"
-                    keyboardType="number-pad"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.formRow}>
-                <View style={styles.formColumnHalf}>
-                  <Text style={styles.inputLabel}>Expiry Date</Text>
-                  <TouchableOpacity
-                    style={styles.dateInput}
-                    onPress={() => setShowDatePicker(true)}
-                  >
-                    <Ionicons name="calendar-outline" size={20} color="#666" />
-                    <Text style={styles.dateText}>
-                      {currentProduct.expiry || 'Select Date'}
-                    </Text>
-                  </TouchableOpacity>
-                  {showDatePicker && (
-                    <DateTimePicker
-                      value={currentProduct.expiry ? new Date(currentProduct.expiry) : new Date()}
-                      mode="date"
-                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                      onChange={onDateChange}
-                      minimumDate={new Date()}
-                    />
-                  )}
-                </View>
-                <View style={styles.formColumnHalf}>
-                  <Text style={styles.inputLabel}>Status *</Text>
-                  {Platform.OS === 'web' ? (
-                    <select
-                      value={currentProduct.status || 'active'}
-                      onChange={(e) => {
-                        console.log('Status changed to:', e.target.value);
-                        setCurrentProduct({ ...currentProduct, status: e.target.value });
-                      }}
-                      style={{
-                        borderWidth: 1,
-                        borderColor: '#ddd',
-                        borderRadius: 8,
-                        padding: 12,
-                        fontSize: 15,
-                        backgroundColor: '#fff',
-                        height: 48,
-                        width: '100%',
-                      }}
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  ) : (
-                    <Picker
-                      selectedValue={currentProduct.status || 'active'}
-                      onValueChange={(itemValue) => {
-                        console.log('Status changed to:', itemValue);
-                        setCurrentProduct({ ...currentProduct, status: itemValue });
-                      }}
-                      style={styles.pickerInput}
-                    >
-                      <Picker.Item label="Active" value="active" />
-                      <Picker.Item label="Inactive" value="inactive" />
-                    </Picker>
-                  )}
-                </View>
-              </View>
-
-              <View style={{ height: 100 }} />
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleSave}
-              >
-                <Text style={styles.saveButtonText}>
-                  {editMode ? 'Update Product' : 'Add Product'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Product Details</Text>
+            <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+
+          <ScrollView style={styles.modalBody}>
+            {currentProduct && (
+              <View>
+                {/* Product Name */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionLabel}>Product Name</Text>
+                  <Text style={styles.detailSectionValue}>{currentProduct.name}</Text>
+                </View>
+
+                {/* SKU */}
+                {currentProduct.sku && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionLabel}>SKU</Text>
+                    <Text style={styles.detailSectionValue}>{currentProduct.sku}</Text>
+                  </View>
+                )}
+
+                {/* Category */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionLabel}>Category</Text>
+                  <Text style={styles.detailSectionValue}>
+                    {getCategoryName(currentProduct.category_id)}
+                  </Text>
+                </View>
+
+                {/* Price */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionLabel}>Price</Text>
+                  <Text style={styles.detailSectionValue}>
+                    ₱{parseFloat(currentProduct.price).toFixed(2)}
+                  </Text>
+                </View>
+
+                {/* Stock Quantity */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionLabel}>Stock Quantity</Text>
+                  <View style={styles.stockContainer}>
+                    <Text style={styles.detailSectionValue}>
+                      {currentProduct.stock_quantity} units
+                    </Text>
+                    {(() => {
+                      const status = getStatusBadge(currentProduct);
+                      return (
+                        <View style={[styles.inlineStatusBadge, { backgroundColor: status.color }]}>
+                          <Text style={styles.inlineStatusText}>{status.text}</Text>
+                        </View>
+                      );
+                    })()}
+                  </View>
+                </View>
+
+                {/* Low Stock Threshold */}
+                {currentProduct.low_stock_threshold && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionLabel}>Low Stock Alert Level</Text>
+                    <Text style={styles.detailSectionValue}>
+                      {currentProduct.low_stock_threshold} units
+                    </Text>
+                  </View>
+                )}
+
+                {/* Barcode */}
+                {currentProduct.barcode && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionLabel}>Barcode</Text>
+                    <View style={styles.barcodeContainer}>
+                      <Ionicons name="barcode-outline" size={24} color="#333" />
+                      <Text style={styles.barcodeValue}>{currentProduct.barcode}</Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Expiry Date */}
+                {currentProduct.expiry && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionLabel}>Expiry Date</Text>
+                    <View style={styles.expiryContainer}>
+                      <Text style={styles.detailSectionValue}>
+                        {new Date(currentProduct.expiry).toLocaleDateString()}
+                      </Text>
+                      {(() => {
+                        const expiryStatus = getExpiryStatus(currentProduct.expiry);
+                        if (expiryStatus) {
+                          return (
+                            <View
+                              style={[
+                                styles.inlineExpiryBadge,
+                                { backgroundColor: expiryStatus.bgColor },
+                              ]}
+                            >
+                              <Text style={[styles.inlineExpiryText, { color: expiryStatus.color }]}>
+                                {expiryStatus.text}
+                              </Text>
+                            </View>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </View>
+                  </View>
+                )}
+
+                {/* Status */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionLabel}>Status</Text>
+                  <Text style={styles.detailSectionValue}>
+                    {currentProduct.status === 'active' ? 'Active' : 'Inactive'}
+                  </Text>
+                </View>
+
+                {/* Description */}
+                {currentProduct.description && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionLabel}>Description</Text>
+                    <Text style={styles.detailSectionValue}>{currentProduct.description}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.closeButton]}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -702,13 +609,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingVertical: 10,
   },
-  addButton: {
-    backgroundColor: '#dc3545',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
+  readOnlyIndicator: {
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+  },
+  readOnlyText: {
+    marginLeft: 5,
+    color: '#6c757d',
+    fontSize: 12,
+    fontWeight: '600',
   },
   filterContainer: {
     flexDirection: 'row',
@@ -776,8 +691,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
   },
-  deleteButton: {
-    padding: 5,
+  readOnlyBadge: {
+    padding: 8,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
   },
   productDetails: {
     marginBottom: 10,
@@ -870,97 +787,83 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     flex: 1,
-    padding: 16,
+    padding: 20,
   },
-  formRow: {
-    flexDirection: 'row',
-    marginBottom: 16,
+  detailSection: {
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  formColumn: {
-    flex: 1,
-  },
-  formColumnHalf: {
-    flex: 1,
-    marginRight: 8,
-  },
-  inputLabel: {
-    fontSize: 13,
+  detailSectionLabel: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#555',
-    marginBottom: 6,
+    color: '#888',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 15,
-    backgroundColor: '#fff',
+  detailSectionValue: {
+    fontSize: 18,
+    fontWeight: '600',
     color: '#333',
   },
-  pickerInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    height: 48,
-    fontSize: 15,
-    color: '#333',
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-  },
-  picker: {
-    height: 50,
-    width: '100%',
-  },
-  dateInput: {
+  stockContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: '#fff',
+    justifyContent: 'space-between',
   },
-  dateText: {
-    fontSize: 15,
+  inlineStatusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  inlineStatusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  barcodeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+  },
+  barcodeValue: {
+    fontSize: 18,
+    fontWeight: '600',
     color: '#333',
     marginLeft: 10,
   },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
+  expiryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  inlineExpiryBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  inlineExpiryText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   modalFooter: {
-    flexDirection: 'row',
     padding: 20,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
   },
   modalButton: {
-    flex: 1,
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
   },
-  cancelButton: {
-    backgroundColor: '#f5f5f5',
-    marginRight: 10,
-  },
-  cancelButtonText: {
-    color: '#666',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  saveButton: {
+  closeButton: {
     backgroundColor: '#dc3545',
   },
-  saveButtonText: {
+  closeButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
