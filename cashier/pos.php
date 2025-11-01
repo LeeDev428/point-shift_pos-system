@@ -233,7 +233,7 @@ ob_start();
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title" id="receiptModalLabel">
-                    <i class="fas fa-check-circle me-2"></i>Sale Complete - Receipt Printed!
+                    <i class="fas fa-check-circle me-2"></i>Receipt printed successfully!
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -242,6 +242,9 @@ ob_start();
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="window.print()">
+                    <i class="fas fa-print me-1"></i>Print Receipt
+                </button>
             </div>
         </div>
     </div>
@@ -270,19 +273,9 @@ ob_start();
     </div>
 </div>
 
-<!-- Printer Bridge Client for RAW printing -->
-<script src="../js/printer-bridge-client.js"></script>
-
 <script>
 let cart = [];
 let discountPercent = 0;
-let currentOrderData = null;
-let printerBridge = null;
-
-// Initialize printer bridge
-document.addEventListener('DOMContentLoaded', function() {
-    printerBridge = new PrinterBridgeClient();
-});
 
 function addToCart(product) {
     const quantityInput = event.target.closest('.product-card')?.querySelector('input[type="number"]');
@@ -469,20 +462,8 @@ document.getElementById('complete-sale').addEventListener('click', function() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Store order data globally for printing
-            currentOrderData = {
-                ...data,
-                cart: [...cart], // Store cart items
-                amountReceived: amountReceived,
-                paymentMethod: paymentMethod,
-                discountPercent: discountPercent
-            };
-            
             // Generate and show receipt
             generateReceipt(data);
-            
-            // Automatically print to thermal printer if enabled
-            autoPrintReceipt(data.order_id);
             
             // Clear cart
             cart = [];
@@ -621,115 +602,6 @@ document.getElementById('product-search').addEventListener('keyup', function(e) 
         window.location.href = `pos.php?search=${encodeURIComponent(this.value)}`;
     }
 });
-
-/**
- * Auto-print receipt using RAW printer bridge
- */
-async function autoPrintReceipt(orderId) {
-    try {
-        // Fetch receipt data
-        const response = await fetch(`../api/receipt.php?order_id=${orderId}`);
-        const result = await response.json();
-        
-        if (result.success && result.data) {
-            if (!printerBridge || !printerBridge.isConnected()) {
-                console.warn('⚠️ Printer bridge offline - Receipt shows on screen only');
-                return;
-            }
-            
-            // Send to printer bridge for RAW printing
-            await printerBridge.printReceipt(result.data);
-        }
-    } catch (error) {
-        console.error('Print error:', error);
-    }
-}
-
-/**
- * Show toast notification
- */
-function showToast(message, type = 'info') {
-    const bgColor = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : 'bg-info';
-    const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
-    
-    const toast = document.createElement('div');
-    toast.className = 'position-fixed top-0 end-0 p-3';
-    toast.style.zIndex = '9999';
-    toast.innerHTML = `
-        <div class="toast show" role="alert">
-            <div class="toast-header ${bgColor} text-white">
-                <i class="fas ${icon} me-2"></i>
-                <strong class="me-auto">${type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Info'}</strong>
-                <button type="button" class="btn-close btn-close-white" onclick="this.closest('.position-fixed').remove()"></button>
-            </div>
-            <div class="toast-body">
-                ${message}
-            </div>
-        </div>
-    `;
-    document.body.appendChild(toast);
-    
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-        if (toast.parentNode) {
-            toast.remove();
-        }
-    }, 5000);
-}
-
-/**
- * Manual print receipt to thermal printer (triggered by button)
- */
-async function printReceipt() {
-    if (!currentOrderData) {
-        alert('No receipt data available');
-        return;
-    }
-    
-    try {
-        showToast('Sending receipt to printer...', 'info');
-        
-        // Fetch receipt data from server
-        const response = await fetch(`../api/receipt.php?order_id=${currentOrderData.order_id}`);
-        const result = await response.json();
-        
-        if (result.success && result.data) {
-            if (!thermalPrinter) {
-                thermalPrinter = new ThermalPrinter('Point Shift Thermal Printer');
-            }
-            
-            // Print to thermal printer
-            const printResult = await thermalPrinter.printReceipt(result.data);
-            
-            if (printResult.success) {
-                showToast('Receipt sent to thermal printer successfully!', 'success');
-            } else {
-                alert('Failed to print: ' + printResult.message);
-            }
-        } else {
-            alert('Failed to fetch receipt data: ' + (result.message || 'Unknown error'));
-        }
-    } catch (error) {
-        console.error('Print error:', error);
-        alert('Error printing receipt: ' + error.message);
-    }
-}
-
-/**
- * Test thermal printer connection
- */
-async function testThermalPrinter() {
-    if (!thermalPrinter) {
-        thermalPrinter = new ThermalPrinter('Point Shift Thermal Printer');
-    }
-    
-    const result = await thermalPrinter.testPrint();
-    if (result.success) {
-        alert('Test receipt sent to printer successfully!');
-    } else {
-        alert('Failed to send test receipt: ' + result.message);
-    }
-}
 </script>
 
 <style>
